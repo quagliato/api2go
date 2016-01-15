@@ -1,0 +1,26 @@
+{
+  "test": {
+    "requestName": "test",
+    "apiName": "TEST",
+    "params": [
+      {
+        "paramName": "parameter1",
+        "type": "string",
+        "mandatory": true,
+        "validation": {
+          "longerThan": "5",
+          "smallerThan": "100"
+        }
+      },
+      {
+        "paramName": "parameter2",
+        "type": "string",
+        "mandatory": true,
+        "validation": {
+          "longerThan": "60",
+          "smallerThan": "65"
+        }
+      }
+    ]
+  }
+}

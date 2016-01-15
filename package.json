@@ -1,0 +1,37 @@
+{
+  "name": "simple-api",
+  "version": "0.0.1",
+  "description": "Simple structure to create APIs based on HTTP requests over express.",
+  "main": "api.js",
+  "dependencies": {
+    "body-parser": "~1.14.2",
+    "cluster": "~0.7.7",
+    "express": "~4.13.3",
+    "forever-monitor": "~1.7.0",
+    "http-request": "~0.7.0",
+    "markdown": "~0.5.0",
+    "moment": "~2.10.6",
+    "newrelic": "~1.24.0",
+    "nodemailer": "~1.11.0",
+    "nodemailer-smtp-transport": "~1.1.0",
+    "sha1": "~1.1.1"
+  },
+  "devDependencies": {},
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "api",
+    "http",
+    "express"
+  ],
+  "author": "eduardo@quagliato.me",
+  "license": "MIT License",
+  "repository": {
+    "type": "git",
+    "url": "http://github.com/quagliato/simple-api"
+  },
+  "bugs": {
+    "url": "https://github.com/quagliato/simple-api/issues"
+  }
+}
