@@ -133,7 +133,7 @@ module.exports = {
       }
 
 
-      readFromFile("_assets/config-default.json", function(defaultConfigs){
+      readFromFile("{0}/_assets/config-default.json".format(__dirname), function(defaultConfigs){
         if (typeof preseted === "string") {
           readFromFile(preseted, function(customConfigs){
             var configs = mergeConfig(defaultConfigs, customConfigs);

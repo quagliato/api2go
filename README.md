@@ -8,9 +8,11 @@ Simple structure to create APIs based on HTTP requests over express
 
 To install the package:
 ```
+// Go to your project's directory
+// Enter your node_modules directory
 git clone http://github.com/quagliato/simple-api
 cd simple-api
-npm install -g
+npm install
 ```
 
 To use:
