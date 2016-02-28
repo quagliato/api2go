@@ -1,5 +1,5 @@
 {
-  "name": "simple-api",
+  "name": "api2go",
   "version": "0.0.1",
   "description": "Simple structure to create APIs based on HTTP requests over express.",
   "main": "api.js",
@@ -27,9 +27,9 @@
   "license": "MIT License",
   "repository": {
     "type": "git",
-    "url": "http://github.com/quagliato/simple-api"
+    "url": "http://github.com/quagliato/api2go"
   },
   "bugs": {
-    "url": "https://github.com/quagliato/simple-api/issues"
+    "url": "https://github.com/quagliato/api2go/issues"
   }
 }
