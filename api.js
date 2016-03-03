@@ -194,7 +194,7 @@ module.exports = {
         "begin-time": moment().format("YYYYMMDDHHmmssSSSZZ")
       };
 
-      var requestKey = sha1(requestInfo);
+      var requestKey = sha1(JSON.stringify(requestInfo));
 
       var auditInfo = {};
       auditInfo[requestKey] = JSON.parse(JSON.stringify(requestInfo));
