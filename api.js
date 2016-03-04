@@ -233,11 +233,11 @@ module.exports = {
       apiObj.logger(JSON.stringify(auditInfo), "REQUEST-END", apiObj.config.AUDIT_LOG);
 
       if (returnValues.hasOwnProperty("status")) {
-        if (returnValues["status"] == "ERROR") {
-          response.status(400).json(returnValues).end();
-        } else {
-          response.status(200).json(returnValues).end();
-        }
+        // if (returnValues["status"] == "ERROR") {
+        //   response.sendStatus(400).json(returnValues).end();
+        // } else {
+          response.json(returnValues).end();
+        // }
       }
 
       if (callback !== undefined) {
@@ -499,13 +499,13 @@ module.exports = {
         expressApp.post("/status", function(request, response){
           response.header("Access-Control-Allow-Origin", "*");
           response.header("Access-Control-Allow-Headers", "X-Requested-With");
-          response.status(200).json({"status":"OK"}).end();
+          response.json({"status":"OK"}).end();
         });
 
         expressApp.get("/status", function(request, response){
           response.header("Access-Control-Allow-Origin", "*");
           response.header("Access-Control-Allow-Headers", "X-Requested-With");
-          response.status(200).json({"status":"OK"}).end();
+          response.json({"status":"OK"}).end();
         });
 
         /****************************************************************************/
@@ -516,7 +516,7 @@ module.exports = {
           response.header("Access-Control-Allow-Headers", "X-Requested-With");
           fs.lstat("README.md", function(err, stats) {
             if (err) {
-              response.status(404).json({"status":"ERROR"}).end();
+              response.sendStatus(404).json({"status":"ERROR"}).end();
             } else {
               fs.readFile("README.md", "utf-8", function(err, readmeFileContent){
                 var markdown = require('markdown').markdown;
@@ -524,7 +524,7 @@ module.exports = {
                 //TODO: Too heavy doing this all the time?
                 var htmlContent = markdown.toHTML(readmeFileContent);
                 response.set("Content-Type", "text/html");
-                response.status(200).end(htmlContent);
+                response.end(htmlContent);
               }); 
             }
           });
@@ -542,11 +542,11 @@ module.exports = {
           // Parsing the body content of the request.
           var requestBody = request.body;
           if (request.headers.hasOwnProperty("content-type")) {
-            if (request.headers["content-type"] != "application/json") {
+            if (request.headers["content-type"].indexOf("application/json") == -1) {
               try {
                 requestBody = JSON.parse(Object.keys(request.body)[0]);
               } catch (parseError) {
-                response.status(406).json({"status":"ERROR"}).end();
+                response.sendStatus(406).json({"status":"ERROR"}).end();
               }
             }
           }
