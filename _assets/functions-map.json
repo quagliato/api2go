@@ -1,7 +1,5 @@
 {
   "test": {
-    "requestName": "test",
-    "apiName": "TEST",
     "params": [
       {
         "paramName": "parameter1",

@@ -34,6 +34,58 @@ module.exports = {
     apiObj.functionsMap = {};
     apiObj.audit = [];
 
+    /**************************************************************************/
+    /* AUDIT - BEGIN */
+    /**************************************************************************/
+    var startAudit = function(functionName, values) {
+      var requestInfo = {
+        "function": functionName, 
+        "values": values, 
+        "begin-time": moment().format("YYYYMMDDHHmmssSSSZZ")
+      };
+
+      var requestKey = sha1(JSON.stringify(requestInfo));
+      requestInfo["requestKey"] = requestKey;
+
+      apiObj.audit[requestKey] = requestInfo;
+
+      //TODO: Store requestKey, functionName and values
+      apiObj.logger(JSON.stringify(apiObj.audit[requestKey]), "REQUEST-BEGIN", apiObj.config.AUDIT_LOG);
+
+      return requestKey;
+    }
+
+    var finishAudit = function(requestKey, returnValues) {
+      if (typeof returnValues === "string") returnValues = JSON.parse(returnValues);
+
+      var requestInfo = apiObj.audit[requestKey];
+
+      requestInfo["end-time"] = moment().format("YYYYMMDDHHmmssSSSZZ");
+
+      var beginMoment = moment(requestInfo["begin-time"], "YYYYMMDDHHmmssSSSZZ");
+      var endMoment = moment(requestInfo["end-time"], "YYYYMMDDHHmmssSSSZZ");
+
+      var minutes = endMoment.diff(beginMoment, "minutes");
+      var seconds = endMoment.diff(beginMoment, "seconds");
+      var milliseconds = endMoment.diff(beginMoment, "milliseconds");
+
+      requestInfo["duration"] = minutes + "m" + (seconds - (minutes * 60)) + "s" + (milliseconds - (seconds * 1000)) + "ms";
+      requestInfo["returnValues"] = returnValues;
+
+      var auditInfo = {};
+      auditInfo[requestKey] = requestInfo;
+      apiObj.logger(JSON.stringify(auditInfo), "REQUEST-END", apiObj.config.AUDIT_LOG);
+
+      // if (returnValues.hasOwnProperty("status")) {
+      //   response.json(returnValues).end();
+      // }
+    }
+
+    /**************************************************************************/
+    /* AUDIT - END */
+    /**************************************************************************/
+
+
     apiObj.registerFunction = function(functionName, processing, functionMap) {
       apiObj.logger("New function registered: {0}".format(functionName), "INFO");
       apiObj.functions[functionName] = processing;
@@ -185,76 +237,13 @@ module.exports = {
     };
 
     /**************************************************************************/
-    /* AUDIT - BEGIN */
-    /**************************************************************************/
-    apiObj.startAudit = function(functionName, values, response, callback) {
-      var requestInfo = {
-        "function": functionName, 
-        "values": values, 
-        "begin-time": moment().format("YYYYMMDDHHmmssSSSZZ")
-      };
-
-      var requestKey = sha1(JSON.stringify(requestInfo));
-
-      var auditInfo = {};
-      auditInfo[requestKey] = JSON.parse(JSON.stringify(requestInfo));
-
-      requestInfo["response"] = response;
-      apiObj.audit[requestKey] = requestInfo;
-
-      //TODO: Store requestKey, functionName and values
-      apiObj.logger(JSON.stringify(auditInfo), "REQUEST-BEGIN", apiObj.config.AUDIT_LOG);
-
-      callback(requestKey);
-    }
-
-    apiObj.finishAudit = function(requestKey, returnValues, callback) {
-      if (typeof returnValues === "string") returnValues = JSON.parse(returnValues);
-      
-      var requestInfo = apiObj.audit[requestKey];
-      var response = requestInfo["response"];
-
-      requestInfo["end-time"] = moment().format("YYYYMMDDHHmmssSSSZZ");
-
-      var beginMoment = moment(requestInfo["begin-time"], "YYYYMMDDHHmmssSSSZZ");
-      var endMoment = moment(requestInfo["end-time"], "YYYYMMDDHHmmssSSSZZ");
-
-      var minutes = endMoment.diff(beginMoment, "minutes");
-      var seconds = endMoment.diff(beginMoment, "seconds");
-      var milliseconds = endMoment.diff(beginMoment, "milliseconds");
-
-      requestInfo["duration"] = minutes + "m" + (seconds - (minutes * 60)) + "s" + (milliseconds - (seconds * 1000)) + "ms";
-      requestInfo["returnValues"] = returnValues;
-
-      var auditInfo = {};
-      auditInfo[requestKey] = requestInfo;
-      delete auditInfo[requestKey]["response"];
-
-      apiObj.logger(JSON.stringify(auditInfo), "REQUEST-END", apiObj.config.AUDIT_LOG);
-
-      if (returnValues.hasOwnProperty("status")) {
-        // if (returnValues["status"] == "ERROR") {
-        //   response.sendStatus(400).json(returnValues).end();
-        // } else {
-          response.json(returnValues).end();
-        // }
-      }
-
-      if (callback !== undefined) {
-        callback();
-      }
-    }
-
-    /**************************************************************************/
-    /* AUDIT - END */
-    /**************************************************************************/
-
-    /**************************************************************************/
     /* FUNCTION VALIDATION - BEGIN */
     /**************************************************************************/
     // TODO: BREAK THIS SHIT IN PIECES!
 
     apiObj.validateFunction = function(mapPath, functionName, requestBody, callback) {
+      console.log(functionName);
+
       if (apiObj.functionsMap.hasOwnProperty(functionName)) {
         var validationErrors = [];
         functionSpecs = apiObj.functionsMap[functionName];
@@ -338,110 +327,101 @@ module.exports = {
           }
         }
 
-        callback((validationErrors.length === 0 ? undefined : validationErrors), (typeof functionSpecs === "undefined" ? undefined : functionSpecs["apiName"]));
+        return (validationErrors.length > 0 ? validationErrors : undefined);
       } else {
+        // Reads the functions-map
+        var fileContent = fs.readFileSync("_assets/functions-map.json");
+        var functionsMap = JSON.parse(fileContent);
+        var validationErrors = [];
 
-        // Verify if the functions-map JSON exists.
-        fs.lstat(mapPath, function(err, fileStats){
-          if (err) {
-            response.status(500).json({"status":"ERROR", "description":"Couldn't process your request."}).end();
-          } else {
-            // Reads the functions-map
-            fs.readFile("_assets/functions-map.json", function(err, fileContent){
-              var functionsMap = JSON.parse(fileContent);
-              var validationErrors = [];
+        // Verify if the requested function exists in the map.
+        if (!functionsMap.hasOwnProperty(functionName)) {
+          // Error - Function not found
+          validationErrors[validationErrors.length] = {"code": "VAL0000", "description": "Function not found."};
+        } else {
+          functionSpecs = functionsMap[functionName];
 
-              // Verify if the requested function exists in the map.
-              if (!functionsMap.hasOwnProperty(functionName)) {
-                // Error - Function not found
-                validationErrors[validationErrors.length] = {"code": "VAL0000", "description": "Function not found."};
-              } else {
-                functionSpecs = functionsMap[functionName];
+          // Iterate all the parameters specified in the maps.
+          for (var param in functionSpecs["params"]) {
+            param = functionSpecs["params"][param];
 
-                // Iterate all the parameters specified in the maps.
-                for (var param in functionSpecs["params"]) {
-                  param = functionSpecs["params"][param];
+            // The parameter is mandatory but is not in the request content?
+            if (!requestBody.hasOwnProperty(param["paramName"]) && 
+                param["mandatory"] == true) {
+              // Error - Mandatory parameter not present in the request
+              validationErrors[validationErrors.length] = {
+                "param": param["paramName"],
+                "code": "VAL0001",
+                "description": "Mandatory parameter not present in the request"
+              };
 
-                  // The parameter is mandatory but is not in the request content?
-                  if (!requestBody.hasOwnProperty(param["paramName"]) && 
-                      param["mandatory"] == true) {
-                    // Error - Mandatory parameter not present in the request
+            } else {
+              var paramValue = requestBody[param["paramName"]];
+
+              // Validation for string
+              if (param["type"] == "string") {
+                paramValue = paramValue.trim();
+
+                if (param.hasOwnProperty(["validation"]) && 
+                    param["validation"].hasOwnProperty("longerThan") && 
+                    paramValue.length < parseInt(param["validation"]["longerThan"])) {
+                  // Error - String length smaller then needed
+                  validationErrors[validationErrors.length] = {
+                    "param": param["paramName"], 
+                    "code": "VAL1001", 
+                    "description": "String legnth smaller than needed."
+                  };
+                }
+                if (param.hasOwnProperty(["validation"]) && 
+                    param["validation"].hasOwnProperty("longerThan") && 
+                    paramValue.length > parseInt(param["validation"]["smallerThan"])) {
+                  // Error - String length longer then needed 
+                  validationErrors[validationErrors.length] = {
+                    "param": param["paramName"], 
+                    "code": "VAL1002", "description": 
+                    "String legnth longer than needed."
+                  };
+                }
+
+              // validation for integer
+              } else if (param["type"] == "int") {
+                try {
+                  paramValue = parseInt(paramValue);
+
+                  if (param.hasOwnProperty(["validation"]) && 
+                      param["validation"].hasOwnProperty("greaterThan") && 
+                      paramValue < parseInt(param["validation"]["greaterThan"])) {
+                    // Error - String length smaller then needed
                     validationErrors[validationErrors.length] = {
-                      "param": param["paramName"],
-                      "code": "VAL0001",
-                      "description": "Mandatory parameter not present in the request"
+                      "param": param["paramName"], 
+                      "code": "VAL2001", 
+                      "description": "Integer number lesser than needed."
                     };
-
-                  } else {
-                    var paramValue = requestBody[param["paramName"]];
-
-                    // Validation for string
-                    if (param["type"] == "string") {
-                      paramValue = paramValue.trim();
-
-                      if (param.hasOwnProperty(["validation"]) && 
-                          param["validation"].hasOwnProperty("longerThan") && 
-                          paramValue.length < parseInt(param["validation"]["longerThan"])) {
-                        // Error - String length smaller then needed
-                        validationErrors[validationErrors.length] = {
-                          "param": param["paramName"], 
-                          "code": "VAL1001", 
-                          "description": "String legnth smaller than needed."
-                        };
-                      }
-                      if (param.hasOwnProperty(["validation"]) && 
-                          param["validation"].hasOwnProperty("longerThan") && 
-                          paramValue.length > parseInt(param["validation"]["smallerThan"])) {
-                        // Error - String length longer then needed 
-                        validationErrors[validationErrors.length] = {
-                          "param": param["paramName"], 
-                          "code": "VAL1002", "description": 
-                          "String legnth longer than needed."
-                        };
-                      }
-
-                    // validation for integer
-                    } else if (param["type"] == "int") {
-                      try {
-                        paramValue = parseInt(paramValue);
-
-                        if (param.hasOwnProperty(["validation"]) && 
-                            param["validation"].hasOwnProperty("greaterThan") && 
-                            paramValue < parseInt(param["validation"]["greaterThan"])) {
-                          // Error - String length smaller then needed
-                          validationErrors[validationErrors.length] = {
-                            "param": param["paramName"], 
-                            "code": "VAL2001", 
-                            "description": "Integer number lesser than needed."
-                          };
-                        }
-                        if (param.hasOwnProperty(["validation"]) && 
-                            param["validation"].hasOwnProperty("lesserThan") && 
-                            paramValue > parseInt(param["validation"]["lesserThan"])) {
-                          // Error - String length longer then needed
-                          validationErrors[validationErrors.length] = {
-                            "param": param["paramName"], 
-                            "code": "VAL2002", 
-                            "description": "Integer number greater than needed."
-                          };
-                        }
-
-                      } catch (e) {
-                        validationErrors[validationErrors.length] = {
-                          "param": param["paramName"], 
-                          "code": "VAL0002", 
-                          "description": "Integer value could not be parsed into integer."
-                        };
-                      }
-                    }
                   }
+                  if (param.hasOwnProperty(["validation"]) && 
+                      param["validation"].hasOwnProperty("lesserThan") && 
+                      paramValue > parseInt(param["validation"]["lesserThan"])) {
+                    // Error - String length longer then needed
+                    validationErrors[validationErrors.length] = {
+                      "param": param["paramName"], 
+                      "code": "VAL2002", 
+                      "description": "Integer number greater than needed."
+                    };
+                  }
+
+                } catch (e) {
+                  validationErrors[validationErrors.length] = {
+                    "param": param["paramName"], 
+                    "code": "VAL0002", 
+                    "description": "Integer value could not be parsed into integer."
+                  };
                 }
               }
-
-              callback((validationErrors.length === 0 ? undefined : validationErrors), (typeof functionSpecs === "undefined" ? undefined : functionSpecs["apiName"]));
-            });
+            }
           }
-        });
+        }
+
+        return (validationErrors.length > 0 ? validationErrors : undefined);
       }
     };
     /**************************************************************************/
@@ -485,7 +465,7 @@ module.exports = {
 
           // intercept OPTIONS method
           if ('OPTIONS' == req.method) {
-            res.send(200);
+            res.sendStatus(200);
           }
           else {
             next();
@@ -499,13 +479,13 @@ module.exports = {
         expressApp.post("/status", function(request, response){
           response.header("Access-Control-Allow-Origin", "*");
           response.header("Access-Control-Allow-Headers", "X-Requested-With");
-          response.json({"status":"OK"}).end();
+          response.send({"status":"OK"});
         });
 
         expressApp.get("/status", function(request, response){
           response.header("Access-Control-Allow-Origin", "*");
           response.header("Access-Control-Allow-Headers", "X-Requested-With");
-          response.json({"status":"OK"}).end();
+          response.send({"status":"OK"});
         });
 
         /****************************************************************************/
@@ -516,7 +496,7 @@ module.exports = {
           response.header("Access-Control-Allow-Headers", "X-Requested-With");
           fs.lstat("README.md", function(err, stats) {
             if (err) {
-              response.sendStatus(404).json({"status":"ERROR"}).end();
+              response.sendStatus(404).send({"status":"ERROR"});
             } else {
               fs.readFile("README.md", "utf-8", function(err, readmeFileContent){
                 var markdown = require('markdown').markdown;
@@ -533,46 +513,60 @@ module.exports = {
         /****************************************************************************/
         /* API FUNCTIONS */
         /****************************************************************************/
-        expressApp.post("/:functionName", function(request, response){
-          response.header("Access-Control-Allow-Origin", "*");
-          response.header("Access-Control-Allow-Headers", "X-Requested-With");
+        fs.lstat(apiObj.config.API_FUNCTIONS_MAP, function(err, fileStats){
+          if (err) {
+            console.log("Couldn't find the functions map.");
+            process.exit(1);
+          } else {
+            // Reads the functions-map
+            fs.readFile(apiObj.config.API_FUNCTIONS_MAP, function(err, fileContent){
+              var functionsMap = JSON.parse(fileContent);
 
-          var functionName = request.params.functionName;
+              for (var functionName in functionsMap) {
+                expressApp.post("/" + functionName, function(req, res){
+                  res.header("Access-Control-Allow-Origin", "*");
+                  res.header("Access-Control-Allow-Headers", "X-Requested-With");
 
-          // Parsing the body content of the request.
-          var requestBody = request.body;
-          if (request.headers.hasOwnProperty("content-type")) {
-            if (request.headers["content-type"].indexOf("application/json") == -1) {
-              try {
-                requestBody = JSON.parse(Object.keys(request.body)[0]);
-              } catch (parseError) {
-                response.sendStatus(406).json({"status":"ERROR"}).end();
-              }
-            }
-          }
+                  var functionId = req.route.path.replace("/", "");
 
-          apiObj.startAudit(functionName, requestBody, response, function(requestKey){
-            apiObj.validateFunction(apiObj.config.API_FUNCTIONS_MAP, functionName, requestBody, function(validationErrors, apiFunctionName){
-              if (validationErrors) {
-                apiObj.finishAudit(requestKey, {"status":"ERROR", "validationErrors": validationErrors});
-              } else {
-                // if (typeof moduleObject.functions[apiFunctionName] === "undefined") {
-                //   finishAudit(requestKey, {"status":"ERROR", "description": "Function not registred."});
-                // } else {
-                //   moduleObject.functions[apiFunctionName](requestBody, requestKey, function(returnValues, callback){
-                //     finishAudit(requestKey, returnValues, callback);
-                //   });
-                // }
-                if (typeof apiObj.functions[apiFunctionName] === "undefined") {
-                  apiObj.finishAudit(requestKey, {"status":"ERROR", "description": "Function not registred."});
-                } else {
-                  apiObj.functions[apiFunctionName](requestBody, requestKey, function(returnValues, callback){
-                    apiObj.finishAudit(requestKey, returnValues, callback);
-                  });
-                }
+                  // Parsing the body content of the request.
+                  var requestBody = req.body;
+                  if (req.headers.hasOwnProperty("content-type")) {
+                    if (req.headers["content-type"].indexOf("application/json") == -1) {
+                      try {
+                        requestBody = JSON.parse(Object.keys(req.body)[0]);
+                      } catch (parseError) {
+                        res.sendStatus(406).send({"status":"ERROR"});
+                      }
+                    }
+                  }
+
+                  var apiFunction = apiObj.functions[functionId];
+
+                  var requestKey = startAudit(functionId, requestBody);
+                  var validationErrors = apiObj.validateFunction(apiObj.config.API_FUNCTIONS_MAP, functionId, requestBody);
+                  if (validationErrors) {
+                    var returnValues = {"status":"ERROR", "validationErrors": validationErrors};
+                    finishAudit(requestKey, returnValues);
+                    res.send(returnValues);
+                  } else {
+                    if (typeof apiObj.functions[functionId] === "undefined") {
+                      var returnValues = {"status":"ERROR", "description": "Function not registred."};
+                      finishAudit(requestKey, returnValues);
+                      res.send(returnValues);
+                    res.send(returnValues);
+                    } else {
+                      apiFunction(requestBody, requestKey, function(returnValues, callback){
+                        finishAudit(requestKey, returnValues);
+                        if (!res.headersSent) res.send(returnValues).end();
+                        if (callback) callback();
+                      });
+                    }
+                  }
+                });
               }
             });
-          });
+          }
         });
 
         expressApp.listen(apiObj.config.NODEJS_LISTEN_PORT);
