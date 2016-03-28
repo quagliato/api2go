@@ -533,10 +533,15 @@ module.exports = {
                   var requestBody = req.body;
                   if (req.headers.hasOwnProperty("content-type")) {
                     if (req.headers["content-type"].indexOf("application/json") == -1) {
-                      try {
-                        requestBody = JSON.parse(Object.keys(req.body)[0]);
-                      } catch (parseError) {
-                        res.sendStatus(406).send({"status":"ERROR"});
+
+                      if (typeof requestBody !== "object") {
+                        try {
+                          requestBody = JSON.parse(Object.keys(req.body)[0]);
+                        } catch (parseError) {
+                          res.sendStatus(406).send({"status":"ERROR"});
+                        }
+                      } else{
+                        requestBody = req.body;
                       }
                     }
                   }
