@@ -560,7 +560,7 @@ module.exports = {
                         finishAudit(requestKey, returnValues);
                         if (!res.headersSent) res.send(returnValues).end();
                         if (callback) callback();
-                      });
+                      }, req);
                     }
                   }
                 });
