@@ -355,7 +355,7 @@ module.exports = {
                 "description": "Mandatory parameter not present in the request"
               };
 
-            } else {
+            } else if (requestBody.hasOwnProperty(param["paramName"])) {
               var paramValue = requestBody[param["paramName"]];
 
               // Validation for string
