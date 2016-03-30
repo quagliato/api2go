@@ -181,6 +181,12 @@ module.exports = {
           }
         }
 
+        for (var key in secondary) {
+          if (!configs.hasOwnProperty(key)) {
+            configs[key] = secondary[key];
+          }
+        }
+
         return configs;
       }
 
