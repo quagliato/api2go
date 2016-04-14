@@ -10,12 +10,10 @@ To install the package:
 ```
 // Go to your project's directory
 // Enter your node_modules directory
-git clone http://github.com/quagliato/api2go
-cd api2go
-npm install
+npm install api2go
 ```
 
-To use:
+To use (**before v0.0.10**):
 ```
 var api = require('api2go');
 var apiInstance = api.new("path/to/config.json", function(apiObj){
@@ -46,6 +44,43 @@ var apiInstance = api.new(configs, function(apiObj){
   });
 });
 ```
+
+* * * * *
+
+To use (**from v0.0.10 and on**):
+```
+var API2Go = require('api2go');
+var apiObj = new API2Go("path/to/config.json");
+apiObj.registerFunction("test", function(data, requestKey, callback, requestObj){
+  console.log(data);
+  var returnValues = {
+    "status": "OK",
+    "data": data
+  };
+
+  callback(returnValues);
+});
+apiObj.start();
+
+// OR
+var configs = {};
+
+var API2Go = require('api2go');
+var apiObj = new API2Go(configs);
+
+apiObj.registerFunction("test", function(data, requestKey, callback, requestObj){
+  console.log(data);
+  var returnValues = {
+    "status": "ERROR",
+    "data": data
+  };
+
+  callback(returnValues);
+});
+
+apiObj.start();
+```
+
 
 Every request must return a property *"status"* with *"OK"* or *"ERROR"*.
 
