@@ -453,6 +453,8 @@ var API2Go = function(configSettings){
       }
     }
   }
+
+  this.config = config;
 };
 
 API2Go.prototype.sendMail = sendMail;
