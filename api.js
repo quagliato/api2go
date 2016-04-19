@@ -102,7 +102,7 @@ var logger = function(message, level, filename) {
     fs.lstat(filename, function(err, stats){
       if (err) {
         print(filename, message, level, logTimestamp);
-      } else {  
+      } else {
         if (stats.size >= MAX_FILESIZE) {
           rotate(filename, function(){
             print(filename, message, level, logTimestamp);
@@ -114,9 +114,9 @@ var logger = function(message, level, filename) {
     });
 
     function print(filename, message, level, logTimestamp) {
-      var formattedMessage = 
-          "[" + logTimestamp + "] " + 
-          "[" + level.toUpperCase() + "] " + 
+      var formattedMessage =
+          "[" + logTimestamp + "] " +
+          "[" + level.toUpperCase() + "] " +
           message;
       fs.appendFileSync(filename, formattedMessage + "\n", { encoding: "utf8", "mode": 644 });
       if (level.toUpperCase() == "CRITICAL" || config.DEBUG_MODE == 1) {
@@ -144,8 +144,8 @@ var audit = {};
 
 var startAudit = function(functionName, values) {
   var requestInfo = {
-    "function": functionName, 
-    "values": values, 
+    "function": functionName,
+    "values": values,
     "begin-time": moment().format("YYYYMMDDHHmmssSSSZZ")
   };
 
@@ -192,7 +192,7 @@ var finishAudit = function(requestKey, returnValues) {
 var sendMail = function(toAddress, fromAddress, emailSubject, htmlContent, plainTextContent, callback){
   var nodemailer = require("nodemailer");
   var smtpTransport = require('nodemailer-smtp-transport');
-   
+
   var transporter = nodemailer.createTransport(smtpTransport({
     host: config.MAIL_HOST,
     port: config.MAIL_PORT,
@@ -255,7 +255,7 @@ var validateFunction = function(mapPath, functionsMap, functionName, requestBody
       param = functionSpecs["params"][param];
 
       // The parameter is mandatory but is not in the request content?
-      if (!requestBody.hasOwnProperty(param["paramName"]) && 
+      if (!requestBody.hasOwnProperty(param["paramName"]) &&
           param["mandatory"] == true) {
         // Error - Mandatory parameter not present in the request
         validationErrors[validationErrors.length] = {
@@ -272,23 +272,23 @@ var validateFunction = function(mapPath, functionsMap, functionName, requestBody
           if (param["type"] == "string") {
             paramValue = paramValue.trim();
 
-            if (param.hasOwnProperty(["validation"]) && 
-                param["validation"].hasOwnProperty("longerThan") && 
+            if (param.hasOwnProperty(["validation"]) &&
+                param["validation"].hasOwnProperty("longerThan") &&
                 paramValue.length < parseInt(param["validation"]["longerThan"])) {
               // Error - String length smaller then needed
               validationErrors[validationErrors.length] = {
-                "param": param["paramName"], 
-                "code": "VAL1001", 
+                "param": param["paramName"],
+                "code": "VAL1001",
                 "description": "String legnth smaller than needed."
               };
             }
-            if (param.hasOwnProperty(["validation"]) && 
-                param["validation"].hasOwnProperty("longerThan") && 
+            if (param.hasOwnProperty(["validation"]) &&
+                param["validation"].hasOwnProperty("longerThan") &&
                 paramValue.length > parseInt(param["validation"]["smallerThan"])) {
-              // Error - String length longer then needed 
+              // Error - String length longer then needed
               validationErrors[validationErrors.length] = {
-                "param": param["paramName"], 
-                "code": "VAL1002", "description": 
+                "param": param["paramName"],
+                "code": "VAL1002", "description":
                 "String legnth longer than needed."
               };
             }
@@ -298,31 +298,31 @@ var validateFunction = function(mapPath, functionsMap, functionName, requestBody
             try {
               paramValue = parseInt(paramValue);
 
-              if (param.hasOwnProperty(["validation"]) && 
-                  param["validation"].hasOwnProperty("greaterThan") && 
+              if (param.hasOwnProperty(["validation"]) &&
+                  param["validation"].hasOwnProperty("greaterThan") &&
                   paramValue < parseInt(param["validation"]["greaterThan"])) {
                 // Error - String length smaller then needed
                 validationErrors[validationErrors.length] = {
-                  "param": param["paramName"], 
-                  "code": "VAL2001", 
+                  "param": param["paramName"],
+                  "code": "VAL2001",
                   "description": "Integer number lesser than needed."
                 };
               }
-              if (param.hasOwnProperty(["validation"]) && 
-                  param["validation"].hasOwnProperty("lesserThan") && 
+              if (param.hasOwnProperty(["validation"]) &&
+                  param["validation"].hasOwnProperty("lesserThan") &&
                   paramValue > parseInt(param["validation"]["lesserThan"])) {
                 // Error - String length longer then needed
                 validationErrors[validationErrors.length] = {
-                  "param": param["paramName"], 
-                  "code": "VAL2002", 
+                  "param": param["paramName"],
+                  "code": "VAL2002",
                   "description": "Integer number greater than needed."
                 };
               }
 
             } catch (e) {
               validationErrors[validationErrors.length] = {
-                "param": param["paramName"], 
-                "code": "VAL0002", 
+                "param": param["paramName"],
+                "code": "VAL0002",
                 "description": "Integer value could not be parsed into integer."
               };
             }
@@ -350,7 +350,7 @@ var validateFunction = function(mapPath, functionsMap, functionName, requestBody
         param = functionSpecs["params"][param];
 
         // The parameter is mandatory but is not in the request content?
-        if (!requestBody.hasOwnProperty(param["paramName"]) && 
+        if (!requestBody.hasOwnProperty(param["paramName"]) &&
             param["mandatory"] == true) {
           // Error - Mandatory parameter not present in the request
           validationErrors[validationErrors.length] = {
@@ -366,23 +366,23 @@ var validateFunction = function(mapPath, functionsMap, functionName, requestBody
           if (param["type"] == "string") {
             paramValue = paramValue.trim();
 
-            if (param.hasOwnProperty(["validation"]) && 
-                param["validation"].hasOwnProperty("longerThan") && 
+            if (param.hasOwnProperty(["validation"]) &&
+                param["validation"].hasOwnProperty("longerThan") &&
                 paramValue.length < parseInt(param["validation"]["longerThan"])) {
               // Error - String length smaller then needed
               validationErrors[validationErrors.length] = {
-                "param": param["paramName"], 
-                "code": "VAL1001", 
+                "param": param["paramName"],
+                "code": "VAL1001",
                 "description": "String legnth smaller than needed."
               };
             }
-            if (param.hasOwnProperty(["validation"]) && 
-                param["validation"].hasOwnProperty("longerThan") && 
+            if (param.hasOwnProperty(["validation"]) &&
+                param["validation"].hasOwnProperty("longerThan") &&
                 paramValue.length > parseInt(param["validation"]["smallerThan"])) {
-              // Error - String length longer then needed 
+              // Error - String length longer then needed
               validationErrors[validationErrors.length] = {
-                "param": param["paramName"], 
-                "code": "VAL1002", "description": 
+                "param": param["paramName"],
+                "code": "VAL1002", "description":
                 "String legnth longer than needed."
               };
             }
@@ -392,31 +392,31 @@ var validateFunction = function(mapPath, functionsMap, functionName, requestBody
             try {
               paramValue = parseInt(paramValue);
 
-              if (param.hasOwnProperty(["validation"]) && 
-                  param["validation"].hasOwnProperty("greaterThan") && 
+              if (param.hasOwnProperty(["validation"]) &&
+                  param["validation"].hasOwnProperty("greaterThan") &&
                   paramValue < parseInt(param["validation"]["greaterThan"])) {
                 // Error - String length smaller then needed
                 validationErrors[validationErrors.length] = {
-                  "param": param["paramName"], 
-                  "code": "VAL2001", 
+                  "param": param["paramName"],
+                  "code": "VAL2001",
                   "description": "Integer number lesser than needed."
                 };
               }
-              if (param.hasOwnProperty(["validation"]) && 
-                  param["validation"].hasOwnProperty("lesserThan") && 
+              if (param.hasOwnProperty(["validation"]) &&
+                  param["validation"].hasOwnProperty("lesserThan") &&
                   paramValue > parseInt(param["validation"]["lesserThan"])) {
                 // Error - String length longer then needed
                 validationErrors[validationErrors.length] = {
-                  "param": param["paramName"], 
-                  "code": "VAL2002", 
+                  "param": param["paramName"],
+                  "code": "VAL2002",
                   "description": "Integer number greater than needed."
                 };
               }
 
             } catch (e) {
               validationErrors[validationErrors.length] = {
-                "param": param["paramName"], 
-                "code": "VAL0002", 
+                "param": param["paramName"],
+                "code": "VAL0002",
                 "description": "Integer value could not be parsed into integer."
               };
             }
@@ -511,12 +511,12 @@ API2Go.prototype.start = function(){
       } else {
         fs.readFile("README.md", "utf-8", function(err, readmeFileContent){
           var markdown = require('markdown').markdown;
-          
+
           //TODO: Too heavy doing this all the time?
           var htmlContent = markdown.toHTML(readmeFileContent);
           response.set("Content-Type", "text/html");
           response.end(htmlContent);
-        }); 
+        });
       }
     });
   });
@@ -538,11 +538,15 @@ API2Go.prototype.start = function(){
 
       // Parsing the body content of the request.
       var requestBody = req.body;
-      if (req.headers.hasOwnProperty("content-type") && req.headers["content-type"].indexOf("application/json") == -1) {
-        try {
-          requestBody = JSON.parse(Object.keys(req.body)[0]);
-        } catch (parseError) {
-          res.sendStatus(406).send({"status":"ERROR"});
+      try {
+        var stringTest = JSON.stringify(requestBody);
+      } catch (e) {
+        if (req.headers.hasOwnProperty("content-type") && req.headers["content-type"].indexOf("application/json") == -1) {
+          try {
+            requestBody = JSON.parse(Object.keys(req.body)[0]);
+          } catch (parseError) {
+            res.sendStatus(406).send({"status":"ERROR"});
+          }
         }
       }
 
