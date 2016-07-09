@@ -228,6 +228,7 @@ var sendMail = function(toAddress, fromAddress, emailSubject, htmlContent, plain
 /******************************************************************************/
 var functions = {};
 var functionsMap = {};
+var paths = {};
 var registerFunction = function(functionName, processing, functionMap) {
   logger("New function registered: {0}".format(functionName), "INFO");
   if (functionMap !== undefined) {
@@ -235,6 +236,21 @@ var registerFunction = function(functionName, processing, functionMap) {
       logger("Function {0} is already defined in the functions map file. Descading this definition.".format(functionName), "INFO");
     } else {
       functionsMap[functionName] = functionMap;
+      var path = functionName;
+      if (functionMap.hasOwnProperty("path") && functionMap.hasOwnProperty("module")) {
+        // Modules can't have slashes in their names.
+        if (functionMap["module"].indexOf("/") !== undefined) {
+          //TODO: Error
+        }
+
+        // Path must not begin with a slash.
+        if (functionMap["path"].substr(0, 1) == "/") {
+          functionMap["path"] = functionMap["path"].substr(1);
+        }
+
+        path = functionMap["module"] + "/" + functionMap["path"];
+      }
+      paths[path] = functionName;
     }
   }
   functions[functionName] = processing;
@@ -450,6 +466,22 @@ var API2Go = function(configSettings){
       var fileFunctionsMap = JSON.parse(fileContent);
       for (var functionName in fileFunctionsMap) {
         functionsMap[functionName] = fileFunctionsMap[functionName];
+        var functionMap = functionsMap[functionName];
+        var path = functionName;
+        if (functionMap.hasOwnProperty("path") && functionMap.hasOwnProperty("module")) {
+          // Modules can't have slashes in their names.
+          if (functionMap["module"].indexOf("/") !== undefined) {
+            //TODO: Error
+          }
+
+          // Path must not begin with a slash.
+          if (functionMap["path"].substr(0, 1) == "/") {
+            functionMap["path"] = functionMap["path"].substr(1);
+          }
+
+          path = functionMap["module"] + "/" + functionMap["path"];
+        }
+        paths[path] = functionName;
       }
     }
   }
@@ -530,11 +562,28 @@ API2Go.prototype.start = function(){
       method = functionMapping["method"].toLowerCase();
     }
 
-    expressApp[method]("/" + functionName, function(req, res){
+    // Primary path is the functionName, but when developing a REST API, for
+    // example, you may need the possibility to register different functions
+    // in the same path, like a PUT and a GET on the same ID.
+    var path = functionName;
+    if (functionMapping.hasOwnProperty("path") && functionMapping.hasOwnProperty("module")) {
+
+      // Modules can't have slashes in their names.
+      if (functionMapping["module"].indexOf("/") !== undefined) {
+        //TODO: Error
+      }
+
+      // Path must not begin with a slash.
+      if (functionMapping["path"].substr(0, 1) == "/") {
+        functionMapping["path"] = functionMapping["path"].substr(1);
+      }
+
+      path = functionMapping["module"] + "/" + functionMapping["path"];
+    }
+
+    expressApp[method]("/" + path, function(req, res){
       res.header("Access-Control-Allow-Origin", "*");
       res.header("Access-Control-Allow-Headers", "X-Requested-With");
-
-      var functionId = req.route.path.replace("/", "");
 
       // Parsing the body content of the request.
       var requestBody = req.body;
@@ -550,6 +599,10 @@ API2Go.prototype.start = function(){
         }
       }
 
+      var requestedPath = req.route.path.substr(1);
+      var functionId = paths[requestedPath];
+
+      // var functionId = req.route.path.replace("/", "");
       var apiFunction = functions[functionId];
 
       var requestKey = startAudit(functionId, requestBody);

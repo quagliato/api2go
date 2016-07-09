@@ -20,5 +20,30 @@
         }
       }
     ]
+  },
+  "test2": {
+    "path": ":id",
+    "module": "default",
+    "method": "get",
+    "params": [
+      {
+        "paramName": "parameter1",
+        "type": "string",
+        "mandatory": false,
+        "validation": {
+          "longerThan": "5",
+          "smallerThan": "100"
+        }
+      },
+      {
+        "paramName": "parameter2",
+        "type": "string",
+        "mandatory": false,
+        "validation": {
+          "longerThan": "60",
+          "smallerThan": "65"
+        }
+      }
+    ]
   }
 }
