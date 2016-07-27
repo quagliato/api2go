@@ -192,11 +192,11 @@ var finishAudit = function(requestKey, returnValues) {
 var sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlContent, plainTextContent, callback){
   // Function to validate if email address has @ and . after the @
   var validateEmail = function(address){
-    var problems = false;
-    if (address.indexOf("@") <= 0) problems = true;
+    var ok = true;
+    if (address.indexOf("@") <= 0) ok = false;
     var postAt = address.substr(address.indexOf("@"));
-    if (postAt.indexOf(".") <= 0) problems = true;
-    return problems;
+    if (postAt.indexOf(".") <= 0) ok = false;
+    return ok;
   }
 
   if (typeof callback !== "function") {
