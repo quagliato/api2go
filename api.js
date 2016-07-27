@@ -189,7 +189,36 @@ var finishAudit = function(requestKey, returnValues) {
 /******************************************************************************/
 /* MAIL */
 /******************************************************************************/
-var sendMail = function(toAddress, fromAddress, emailSubject, htmlContent, plainTextContent, callback){
+var sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlContent, plainTextContent, callback){
+  // Function to validate if email address has @ and . after the @
+  var validateEmail = function(address){
+    var problems = false;
+    if (address.indexOf("@") <= 0) problems = true;
+    var postAt = address.substr(address.indexOf("@"));
+    if (postAt.indexOf(".") <= 0) problems = true;
+    return problems;
+  }
+
+  if (typeof callback !== "function") {
+    logger("The callback for sendMail must be a function.", "CRITICAL");
+    callback(false);
+  }
+
+  if (toAddress === undefined || toAddress == "" || fromAddress === undefined || fromName == "" || emailSubject === undefined || emailSubject == "" || htmlContent === undefined || htmlContent == "") {
+    logger("In order to send an email, to address, from address, from name, email subject and HTML content are required.", "CRITICAL");
+    callback(false);
+  }
+
+  if (!validateEmail(toAddress)) {
+    logger("The {0} address is not valid.".format(toAddress), "CRITICAL");
+    callback(false);
+  }
+
+  if (!validateEmail(fromAddress)) {
+    logger("The {0} address is not valid.".format(fromAddress), "CRITICAL");
+    callback(false);
+  }
+
   var nodemailer = require("nodemailer");
   var smtpTransport = require('nodemailer-smtp-transport');
 
@@ -206,10 +235,11 @@ var sendMail = function(toAddress, fromAddress, emailSubject, htmlContent, plain
 
   var mailOptions = {
     to: toAddress,
-    from: (fromAddress !== undefined ? fromAddress : undefined),
+    from: "{0} <{1}>".format(fromName, config.MAIL_DEFAULT_FROM_USER),
     subject: emailSubject,
     text: (plainTextContent !== undefined ? plainTextContent : undefined),
-    html: htmlContent
+    html: htmlContent,
+    replyTo: "{0} <{1}>".format(fromName, fromAddress)
   };
 
   transporter.sendMail(mailOptions, function(error, info){
