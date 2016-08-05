@@ -189,7 +189,7 @@ var finishAudit = function(requestKey, returnValues) {
 /******************************************************************************/
 /* MAIL */
 /******************************************************************************/
-var sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlContent, plainTextContent, callback){
+var sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlContent, plainTextContent, callback, ccAddress, bccAddress){
   // Function to validate if email address has @ and . after the @
   var validateEmail = function(address){
     var ok = true;
@@ -219,6 +219,20 @@ var sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlCont
     callback(false);
   }
 
+  if (ccAddress !== undefined) {
+    if (!validateEmail(ccAddress)) {
+      logger("The {0} address is not valid.".format(ccAddress), "CRITICAL");
+      callback(false);
+    }
+  }
+
+  if (bccAddress !== undefined) {
+    if (!validateEmail(bccAddress)) {
+      logger("The {0} address is not valid.".format(bccAddress), "CRITICAL");
+      callback(false);
+    }
+  }
+
   var nodemailer = require("nodemailer");
   var smtpTransport = require('nodemailer-smtp-transport');
 
@@ -239,7 +253,9 @@ var sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlCont
     subject: emailSubject,
     text: (plainTextContent !== undefined ? plainTextContent : undefined),
     html: htmlContent,
-    replyTo: "{0} <{1}>".format(fromName, fromAddress)
+    replyTo: "{0} <{1}>".format(fromName, fromAddress),
+    cc: (ccAddress !== undefined ? bccAddress : undefined),
+    bcc: (ccAddress !== undefined ? bccAddress : undefined)
   };
 
   transporter.sendMail(mailOptions, function(error, info){
