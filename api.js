@@ -254,8 +254,8 @@ var sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlCont
     text: (plainTextContent !== undefined ? plainTextContent : undefined),
     html: htmlContent,
     replyTo: "{0} <{1}>".format(fromName, fromAddress),
-    cc: (ccAddress !== undefined ? bccAddress : undefined),
-    bcc: (ccAddress !== undefined ? bccAddress : undefined)
+    cc: (ccAddress !== undefined ? ccAddress : undefined),
+    bcc: (bccAddress !== undefined ? bccAddress : undefined)
   };
 
   transporter.sendMail(mailOptions, function(error, info){
