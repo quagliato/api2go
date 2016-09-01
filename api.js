@@ -537,6 +537,7 @@ var API2Go = function(configSettings){
 
 API2Go.prototype.sendMail = sendMail;
 API2Go.prototype.registerFunction = registerFunction;
+API2Go.prototype.logger = logger;
 API2Go.prototype.start = function(){
   var expressApp = new express();
 
