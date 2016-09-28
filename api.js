@@ -1,18 +1,14 @@
-// REST API Module based on express
+// API2GO
 // Created by Eduardo Quagliato <eduardo@quagliato.me>
 // São Paulo, Brasil
 // 2015-12-21
 
 // DEPENDENCIES (in alphabetical order)
 var bodyParser                   = require('body-parser');
-var cluster                      = require('cluster');
 var express                      = require('express');
 var fs                           = require('fs');
 var moment                       = require('moment');
 var sha1                         = require('sha1');
-
-// CUSTOM DEVELOPED MODULES
-// logger                       = require('./logger.js');
 
 String.prototype.format = function()
 {
@@ -130,9 +126,52 @@ var API2Go = function(configSettings){
   /******************************************************************************/
   /* MAIL */
   /******************************************************************************/
-  this.sendMail = function(toAddress, fromAddress, emailSubject, htmlContent, plainTextContent, callback){
+  this.sendMail = function(toAddress, fromAddress, emailSubject, htmlContent, plainTextContent, callback, ccAddress, bccAddress){
     var nodemailer = require("nodemailer");
     var smtpTransport = require('nodemailer-smtp-transport');
+
+    var validateEmail = function(address){
+    var ok = true;
+    if (address.indexOf("@") <= 0) ok = false;
+      var postAt = address.substr(address.indexOf("@"));
+      if (postAt.indexOf(".") <= 0) ok = false;
+      return ok;
+    }
+
+    if (typeof callback !== "function") {
+      logger("The callback for sendMail must be a function.", "CRITICAL");
+      callback(false);
+    }
+
+    if (toAddress === undefined || toAddress == "" || fromAddress === undefined || fromName == "" || emailSubject === undefined || emailSubject == "" || htmlContent === undefined || htmlContent == "") {
+      logger("In order to send an email, to address, from address, from name, email subject and HTML content are required.", "CRITICAL");
+      callback(false);
+    }
+     
+    if (!validateEmail(toAddress)) {
+      logger("The {0} address is not valid.".format(toAddress), "CRITICAL");
+      callback(false);
+    }
+       
+        
+    if (!validateEmail(fromAddress)) {
+      logger("The {0} address is not valid.".format(fromAddress), "CRITICAL");
+      callback(false);
+    }
+
+    if (ccAddress !== undefined) {
+      if (!validateEmail(ccAddress)) {
+        logger("The {0} address is not valid.".format(ccAddress), "CRITICAL");
+        callback(false);
+      }
+    }
+           
+    if (bccAddress !== undefined) {
+      if (!validateEmail(bccAddress)) {
+        logger("The {0} address is not valid.".format(bccAddress), "CRITICAL");
+        callback(false);
+      }
+    }
 
     var transporter = nodemailer.createTransport(smtpTransport({
       host: apiObj.config.MAIL_HOST,
@@ -144,13 +183,16 @@ var API2Go = function(configSettings){
         pass: apiObj.config.MAIL_PASSWORD
       }
     }));
-
+    
     var mailOptions = {
       to: toAddress,
-      from: (fromAddress !== undefined ? fromAddress : undefined),
+      from: "{0} <{1}>".format(fromName, config.MAIL_DEFAULT_FROM_USER),
       subject: emailSubject,
       text: (plainTextContent !== undefined ? plainTextContent : undefined),
-      html: htmlContent
+      html: htmlContent,
+      replyTo: "{0} <{1}>".format(fromName, fromAddress),
+      cc: (ccAddress !== undefined ? ccAddress : undefined),
+      bcc: (bccAddress !== undefined ? bccAddress : undefined)
     };
 
     transporter.sendMail(mailOptions, function(error, info){

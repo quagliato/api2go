@@ -13,5 +13,5 @@
   "MAIL_PASSWORD"            : "xxxx",
   "MAIL_SECURE"              : true,
   "MAIL_IGNORE_TLS"          : true,
-  "MAIL_DEFAULT_FROM_USER"        : "a@b.c"
+  "MAIL_DEFAULT_FROM_USER"   : "a@b.c"
 }

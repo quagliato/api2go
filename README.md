@@ -2,218 +2,102 @@
 
 ## Description
 
-Simple structure to create APIs based on HTTP requests over express
+Simple structure to create APIs based on HTTP requests over express.
+
+You can create RESTful or RPC APIs, using any kind of HTTP method accepted by
+expressjs and customize the paths you use.
+
+### Why use API2Go instead of express?
+
+API2Go abstracts a lot of things that in express you would have to implement
+manually, like this:
+
+- **Logger**: API2GO() has a **logger** function publicly accessible;
+- **Email**: every instance of API2Go() has also a function **sendMail** 
+publicly accessible;
+- **Auditing**: the API2Go logs every request, the input, the output, how many
+time it tooks to process etc.
+
+### Some things that need to be implemented
+
+Like any one-man-army, I can't do everything at the same time, so these are some
+of the things that I plan to program or want to program:
+
+- Middleware;
+- Unified and strong authentication (can't continue using the payload);
+- Headers filtering;
+- N-level validation on functions' map;
+- Got any idea? *eduardo@quagliato.me* or add a new issue in the Github repo;
 
 ## Usage
 
-To install the package:
-```
-// Go to your project's directory
-// Enter your node_modules directory
-npm install api2go
-```
+    npm install api2go
 
 * * * * *
 
 To use (**from v0.0.13 and on**):
-```
-var API2Go = require('api2go');
-var apiObj = new API2Go("path/to/config.json");
-apiObj.registerFunction("test", function(payload, requestKey, callback, req, res){
-  console.log(pauload);
-  var returnValues = {
-    "status": "OK",
-    "data": data
-  };
+    
+    var API2Go = require('api2go');
 
-  callback(returnValues);
-},{
-  "path": ":id",
-  "module": "default",
-  "method": "get",
-  "params": [
-    {
-      "paramName": "parameter1",
-      "type": "string",
-      "mandatory": false,
-      "validation": {
-        "longerThan": "5",
-        "smallerThan": "100"
-      }
+    // You can instance N API objects in the same application, but they have to
+    // listen to different ports.
+    var apiObj = new API2Go("path/to/config.json");
+
+    // You can also instance a API object without a file, but informing the config
+    // object right here, like this:
+    var apiObj = new API2Go({
+      "DEBUG_MODE"               : 1,
+      "NODEJS_LISTEN_PORT"       : 3000,
+      "API_FUNCTIONS_MAP"        : "_assets/functions-map.json",
+      "GENERAL_LOG"              : "_logs/general.log"
+    });
+
+    // You have to register the functions that you want to make invokable
+    apiObj.registerFunction("test", function(payload, requestKey, callback, req, res){
+      console.log(payload);
+      var returnValues = {
+        "status": "OK",
+        "data": data
+      };
+
+      callback(returnValues);
     },
+    // This is the map for the function, it defines the path which this request can
+    // be invoke and the parameters that will be validated.
     {
-      "paramName": "parameter2",
-      "type": "string",
-      "mandatory": false,
-      "validation": {
-        "longerThan": "60",
-        "smallerThan": "65"
-      }
-    }
-  ]
-});
-apiObj.start();
-```
-
-* * * * *
-
-To use (**from v0.0.10 to v0.0.12**):
-```
-var API2Go = require('api2go');
-var apiObj = new API2Go("path/to/config.json");
-apiObj.registerFunction("test", function(data, requestKey, callback, requestObj){
-  console.log(data);
-  var returnValues = {
-    "status": "OK",
-    "data": data
-  };
-
-  callback(returnValues);
-},{
-  "params": [
-    {
-      "paramName": "parameter1",
-      "type": "string",
-      "mandatory": false,
-      "validation": {
-        "longerThan": "5",
-        "smallerThan": "100"
-      }
-    },
-    {
-      "paramName": "parameter2",
-      "type": "string",
-      "mandatory": false,
-      "validation": {
-        "longerThan": "60",
-        "smallerThan": "65"
-      }
-    }
-  ]
-});
-apiObj.start();
-
-// OR
-var configs = {};
-
-var API2Go = require('api2go');
-var apiObj = new API2Go(configs);
-
-apiObj.registerFunction("test", function(data, requestKey, callback, requestObj){
-  console.log(data);
-  var returnValues = {
-    "status": "ERROR",
-    "data": data
-  };
-
-  callback(returnValues);
-},{
-  "params": [
-    {
-      "paramName": "parameter1",
-      "type": "string",
-      "mandatory": false,
-      "validation": {
-        "longerThan": "5",
-        "smallerThan": "100"
-      }
-    },
-    {
-      "paramName": "parameter2",
-      "type": "string",
-      "mandatory": false,
-      "validation": {
-        "longerThan": "60",
-        "smallerThan": "65"
-      }
-    }
-  ]
-});
-
-apiObj.start();
-```
-
-* * * * *
-
-To use (**before v0.0.10**):
-```
-var api = require('api2go');
-var apiInstance = api.new("path/to/config.json", function(apiObj){
-  apiObj.registerFunction("test", function(data, requestKey, callback){
-    console.log(data);
-    var returnValues = {
-      "status": "OK",
-      "data": data
-    };
-
-    callback(returnValues);
-  },{
-    "params": [
-      {
-        "paramName": "parameter1",
-        "type": "string",
-        "mandatory": false,
-        "validation": {
-          "longerThan": "5",
-          "smallerThan": "100"
+      "path": ":id",
+      "module": "default",
+      "method": "get",
+      "params": [
+        {
+          "paramName": "parameter1",
+          "type": "string",
+          "mandatory": false,
+          "validation": {
+            "longerThan": "5",
+            "smallerThan": "100"
+          }
+        },
+        {
+          "paramName": "parameter2",
+          "type": "string",
+          "mandatory": false,
+          "validation": {
+            "longerThan": "60",
+            "smallerThan": "65"
+          }
         }
-      },
-      {
-        "paramName": "parameter2",
-        "type": "string",
-        "mandatory": false,
-        "validation": {
-          "longerThan": "60",
-          "smallerThan": "65"
-        }
-      }
-    ]
-  });
-});
+      ]
+    });
 
-// OR
-
-var configs = {};
-
-var apiInstance = api.new(configs, function(apiObj){
-  apiObj.registerFunction("test", function(data, requestKey, callback){
-    console.log(data);
-    var returnValues = {
-      "status": "ERROR",
-      "data": data
-    };
-
-    callback(returnValues);
-  },{
-    "params": [
-      {
-        "paramName": "parameter1",
-        "type": "string",
-        "mandatory": false,
-        "validation": {
-          "longerThan": "5",
-          "smallerThan": "100"
-        }
-      },
-      {
-        "paramName": "parameter2",
-        "type": "string",
-        "mandatory": false,
-        "validation": {
-          "longerThan": "60",
-          "smallerThan": "65"
-        }
-      }
-    ]
-  });
-});
-```
+    // The API will start listen in the port you specified in the config.
+    apiObj.start();
 
 Every request must return a property *"status"* with *"OK"* or *"ERROR"*.
 
 ## Keep in touch
 
-Eduardo Quagliato, eduardo[at]quagliato[dot]me
+Eduardo Quagliato, eduardo@quagliato.me
 
 ## License
 
