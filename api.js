@@ -126,13 +126,13 @@ var API2Go = function(configSettings){
   /******************************************************************************/
   /* MAIL */
   /******************************************************************************/
-  this.sendMail = function(toAddress, fromAddress, emailSubject, htmlContent, plainTextContent, callback, ccAddress, bccAddress){
+  this.sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlContent, plainTextContent, callback, ccAddress, bccAddress){
     var nodemailer = require("nodemailer");
     var smtpTransport = require('nodemailer-smtp-transport');
 
     var validateEmail = function(address){
-    var ok = true;
-    if (address.indexOf("@") <= 0) ok = false;
+      var ok = true;
+      if (address.indexOf("@") <= 0) ok = false;
       var postAt = address.substr(address.indexOf("@"));
       if (postAt.indexOf(".") <= 0) ok = false;
       return ok;
@@ -143,17 +143,16 @@ var API2Go = function(configSettings){
       callback(false);
     }
 
-    if (toAddress === undefined || toAddress == "" || fromAddress === undefined || fromName == "" || emailSubject === undefined || emailSubject == "" || htmlContent === undefined || htmlContent == "") {
+    if (toAddress === undefined || toAddress == "" || fromName === undefined || fromName == "" || fromAddress === undefined || fromAddress == "" || emailSubject === undefined || emailSubject == "" || htmlContent === undefined || htmlContent == "") {
       logger("In order to send an email, to address, from address, from name, email subject and HTML content are required.", "CRITICAL");
       callback(false);
     }
-     
+
     if (!validateEmail(toAddress)) {
       logger("The {0} address is not valid.".format(toAddress), "CRITICAL");
       callback(false);
     }
-       
-        
+
     if (!validateEmail(fromAddress)) {
       logger("The {0} address is not valid.".format(fromAddress), "CRITICAL");
       callback(false);
@@ -165,7 +164,7 @@ var API2Go = function(configSettings){
         callback(false);
       }
     }
-           
+
     if (bccAddress !== undefined) {
       if (!validateEmail(bccAddress)) {
         logger("The {0} address is not valid.".format(bccAddress), "CRITICAL");
@@ -183,7 +182,7 @@ var API2Go = function(configSettings){
         pass: apiObj.config.MAIL_PASSWORD
       }
     }));
-    
+
     var mailOptions = {
       to: toAddress,
       from: "{0} <{1}>".format(fromName, config.MAIL_DEFAULT_FROM_USER),
