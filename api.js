@@ -185,7 +185,7 @@ var API2Go = function(configSettings){
 
     var mailOptions = {
       to: toAddress,
-      from: "{0} <{1}>".format(fromName, config.MAIL_DEFAULT_FROM_USER),
+      from: "{0} <{1}>".format(fromName, apiObj.config.MAIL_DEFAULT_FROM_USER),
       subject: emailSubject,
       text: (plainTextContent !== undefined ? plainTextContent : undefined),
       html: htmlContent,
