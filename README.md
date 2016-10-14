@@ -95,6 +95,10 @@ To use (**from v0.0.13 and on**):
 
 Every request must return a property *"status"* with *"OK"* or *"ERROR"*.
 
+## Changelog
+
+Refer to `changelog.txt` inside the repo.
+
 ## Keep in touch
 
 Eduardo Quagliato, eduardo@quagliato.me

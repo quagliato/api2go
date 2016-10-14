@@ -1,0 +1,4 @@
+v0.0.24 -- 2016-10-14
+
+* Empty _logs directory to fix the test
+* Dependencies fix
