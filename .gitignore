@@ -1,5 +1,5 @@
 __*
-_logs/*
+_logs/*.log
 *.log
 node_modules
 node_modules/*
