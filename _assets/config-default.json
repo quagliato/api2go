@@ -2,6 +2,8 @@
   "DEBUG_MODE"               : 1,
   "NODEJS_LISTEN_PORT"       : 4242,
   "API_FUNCTIONS_MAP"        : "_assets/functions-map.json",
+  "LANGUAGE_PATH"            : "_lang",
+  "LANGUAGE_DEFAULT"         : "en",
   "AUDIT_LOG"                : "_logs/audit.log",
   "GENERAL_LOG"              : "_logs/general.log",
   "DEBUG_LOG"                : "_logs/debug.log",
