@@ -87,8 +87,8 @@ var API2Go = function(configSettings){
           file = fs.readFileSync(apiObj.config.LANGUAGE_PATH + lang + ".json", "utf-8");
         } catch (err) {
           try {
-            console.log('Language file ' + lang + 'not found. Trying ' + defaultlang + '...');
-            file = fs.readFileSync(apiObj.config.LANGUAGE_PATH + defaultlang + ".json", "utf-8");
+            console.log('Language file ' + lang + 'not found. Trying ' + apiObj.config.LANGUAGE_DEFAULT + '...');
+            file = fs.readFileSync(apiObj.config.LANGUAGE_PATH + apiObj.config.LANGUAGE_DEFAULT + ".json", "utf-8");
           } catch (err) {
             console.error('Default language file not found');
             return false;
@@ -107,8 +107,10 @@ var API2Go = function(configSettings){
     },
     file: function(filename) {
       if (!this.hasOwnProperty("lang_code")) {
-        console.error('Language not set when trying to access file ' + filename);
-        return false;
+        if (!this.set(apiObj.config.LANGUAGE_DEFAULT)) {
+          console.error('Language not set when trying to access file ' + filename);
+          return false;
+        }
       }
       var path = apiObj.config.LANGUAGE_PATH +"file/" + this.lang_code + "/" + filename;
       try {
@@ -121,7 +123,7 @@ var API2Go = function(configSettings){
     },
     "validation": {
       "mandatory_parameter_not_found": "Mandatory parameter not present in the request",
-      "string_length_smaller": "String legnth smaller than needed",
+      "string_length_smaller": "String length smaller than needed",
       "string_length_larger": "String length larger than needed",
       "integer_too_small": "Integer number too small",
       "integer_too_big": "Integer number too big",
@@ -213,7 +215,7 @@ var API2Go = function(configSettings){
     }
 
     if (typeof callback !== "function") {
-      logger("The callback for sendMail must be a function.", "CRITICAL");
+      apiObj.logger("The callback for sendMail must be a function.", "CRITICAL");
       callback(false);
     }
 
@@ -222,30 +224,30 @@ var API2Go = function(configSettings){
         !mailOptions.hasOwnProperty('from') || mailOptions['from'] == "" || 
         !mailTemplate.hasOwnProperty('subject') || mailTemplate['subject'] == "" || 
         !mailTemplate.hasOwnProperty('html') || mailTemplate['html'] == "") {
-      logger("In order to send an email, to address, from address, from name, email subject and HTML content are required.", "CRITICAL");
+      apiObj.logger("In order to send an email, to address, from address, from name, email subject and HTML content are required.", "CRITICAL");
       callback(false);
     }
 
     if (!validateEmail(mailOptions['to'])) {
-      logger("The {0} address is not valid.".format(mailOptions['to']), "CRITICAL");
+      apiObj.logger("The {0} address is not valid.".format(mailOptions['to']), "CRITICAL");
       callback(false);
     }
 
     if (!validateEmail(mailOptions['from'])) {
-      logger("The {0} address is not valid.".format(mailOptions['from']), "CRITICAL");
+      apiObj.logger("The {0} address is not valid.".format(mailOptions['from']), "CRITICAL");
       callback(false);
     }
 
-    if (!mailOptions.hasOwnProperty('cc')) {
+    if (mailOptions.hasOwnProperty('cc')) {
       if (!validateEmail(mailOptions['cc'])) {
-        logger("The {0} address is not valid.".format(mailOptions['cc']), "CRITICAL");
+        apiObj.logger("The {0} address is not valid.".format(mailOptions['cc']), "CRITICAL");
         callback(false);
       }
     }
 
-    if (!mailOptions.hasOwnProperty('bcc')) {
+    if (mailOptions.hasOwnProperty('bcc')) {
       if (!validateEmail(mailOptions['bcc'])) {
-        logger("The {0} address is not valid.".format(mailOptions['bcc']), "CRITICAL");
+        apiObj.logger("The {0} address is not valid.".format(mailOptions['bcc']), "CRITICAL");
         callback(false);
       }
     }
@@ -268,9 +270,9 @@ var API2Go = function(configSettings){
 
     send(mailOptions, context, function(error, info){
       if(error){
-        apiObj.logger("The '{0}' email to {1} couldn't be sent. Stacktrace: {2}".format(emailSubject, toAddress, error), "CRITICAL");
+        apiObj.logger("The '{0}' email to {1} couldn't be sent. Stacktrace: {2}".format(mailTemplate.subject, mailOptions.to, error), "CRITICAL");
       } else {
-        apiObj.logger("The '{0}' email to {1} was succefully sent.".format(emailSubject, toAddress), "INFO");
+        apiObj.logger("The '{0}' email to {1} was succefully sent.".format(mailTemplate.subject, mailOptions.to), "INFO");
       }
 
       callback((error ? true : false));
@@ -356,6 +358,197 @@ var API2Go = function(configSettings){
     //   response.json(returnValues).end();
     // }
   }
+
+  /**************************************************************************/
+  /* FUNCTION VALIDATION - BEGIN */
+  /**************************************************************************/
+  // TODO: BREAK THIS SHIT IN PIECES!
+
+  this.validateFunction = function(functionName, requestBody, callback) {
+    var mapPath = apiObj.config.API_FUNCTIONS_MAP;
+    var functionsMap = apiObj.functionsMap;
+    if (functionsMap.hasOwnProperty(functionName)) {
+      var validationErrors = [];
+      functionSpecs = functionsMap[functionName];
+
+      // Iterate all the parameters specified in the maps.
+      for (var param in functionSpecs["params"]) {
+        param = functionSpecs["params"][param];
+
+        // The parameter is mandatory but is not in the request content?
+        if (!requestBody.hasOwnProperty(param["paramName"]) &&
+            param["mandatory"] == true) {
+          // Error - Mandatory parameter not present in the request
+          validationErrors[validationErrors.length] = {
+            "param": param["paramName"],
+            "code": "VAL0001",
+            "description": apiObj._lang.validation.mandatory_parameter_not_found
+          };
+
+        } else {
+          var paramValue = requestBody[param["paramName"]];
+
+          if (paramValue !== undefined){
+            // Validation for string
+            if (param["type"] == "string") {
+              paramValue = paramValue.trim();
+
+              if (param.hasOwnProperty(["validation"]) &&
+                  param["validation"].hasOwnProperty("longerThan") &&
+                  paramValue.length < parseInt(param["validation"]["longerThan"])) {
+                // Error - String length smaller then needed
+                validationErrors[validationErrors.length] = {
+                  "param": param["paramName"],
+                  "code": "VAL1001",
+                  "description": apiObj._lang.validation.string_length_smaller
+                };
+              }
+              if (param.hasOwnProperty(["validation"]) &&
+                  param["validation"].hasOwnProperty("longerThan") &&
+                  paramValue.length > parseInt(param["validation"]["smallerThan"])) {
+                // Error - String length longer then needed
+                validationErrors[validationErrors.length] = {
+                  "param": param["paramName"],
+                  "code": "VAL1002", 
+                  "description": apiObj._lang.validation.string_length_larger
+                };
+              }
+
+            // validation for integer
+            } else if (param["type"] == "int") {
+              try {
+                paramValue = parseInt(paramValue);
+
+                if (param.hasOwnProperty(["validation"]) &&
+                    param["validation"].hasOwnProperty("greaterThan") &&
+                    paramValue < parseInt(param["validation"]["greaterThan"])) {
+                  // Error - String length smaller then needed
+                  validationErrors[validationErrors.length] = {
+                    "param": param["paramName"],
+                    "code": "VAL2001",
+                    "description": apiObj._lang.validation.integer_too_small
+                  };
+                }
+                if (param.hasOwnProperty(["validation"]) &&
+                    param["validation"].hasOwnProperty("lesserThan") &&
+                    paramValue > parseInt(param["validation"]["lesserThan"])) {
+                  // Error - String length longer then needed
+                  validationErrors[validationErrors.length] = {
+                    "param": param["paramName"],
+                    "code": "VAL2002",
+                    "description": apiObj._lang.validation.integer_too_big
+                  };
+                }
+
+              } catch (e) {
+                validationErrors[validationErrors.length] = {
+                  "param": param["paramName"],
+                  "code": "VAL0002",
+                  "description": apiObj._lang.validation.value_not_integer
+                };
+              }
+            }
+          }
+        }
+      }
+
+      return (validationErrors.length > 0 ? validationErrors : undefined);
+    } else {
+      // Reads the functions-map
+      var fileContent = fs.readFileSync("_assets/functions-map.json");
+      var functionsMap = JSON.parse(fileContent);
+      var validationErrors = [];
+
+      // Verify if the requested function exists in the map.
+      if (!functionsMap.hasOwnProperty(functionName)) {
+        // Error - Function not found
+        validationErrors[validationErrors.length] = {"code": "VAL0000", "description": apiObj._lang.validation.function_not_found};
+      } else {
+        functionSpecs = functionsMap[functionName];
+
+        // Iterate all the parameters specified in the maps.
+        for (var param in functionSpecs["params"]) {
+          param = functionSpecs["params"][param];
+
+          // The parameter is mandatory but is not in the request content?
+          if (!requestBody.hasOwnProperty(param["paramName"]) &&
+              param["mandatory"] == true) {
+            // Error - Mandatory parameter not present in the request
+            validationErrors[validationErrors.length] = {
+              "param": param["paramName"],
+              "code": "VAL0001",
+              "description": apiObj._lang.validation.mandatory_parameter_not_found
+            };
+
+          } else if (requestBody.hasOwnProperty(param["paramName"])) {
+            var paramValue = requestBody[param["paramName"]];
+
+            // Validation for string
+            if (param["type"] == "string") {
+              paramValue = paramValue.trim();
+
+              if (param.hasOwnProperty(["validation"]) &&
+                  param["validation"].hasOwnProperty("longerThan") &&
+                  paramValue.length < parseInt(param["validation"]["longerThan"])) {
+                // Error - String length smaller then needed
+                validationErrors[validationErrors.length] = {
+                  "param": param["paramName"],
+                  "code": "VAL1001",
+                  "description": apiObj._lang.validation.string_length_smaller
+                };
+              }
+              if (param.hasOwnProperty(["validation"]) &&
+                  param["validation"].hasOwnProperty("longerThan") &&
+                  paramValue.length > parseInt(param["validation"]["smallerThan"])) {
+                // Error - String length longer then needed
+                validationErrors[validationErrors.length] = {
+                  "param": param["paramName"],
+                  "code": "VAL1002", "description": apiObj._lang.validation.string_length_larger
+                };
+              }
+
+            // validation for integer
+            } else if (param["type"] == "int") {
+              try {
+                paramValue = parseInt(paramValue);
+
+                if (param.hasOwnProperty(["validation"]) &&
+                    param["validation"].hasOwnProperty("greaterThan") &&
+                    paramValue < parseInt(param["validation"]["greaterThan"])) {
+                  // Error - String length smaller then needed
+                  validationErrors[validationErrors.length] = {
+                    "param": param["paramName"],
+                    "code": "VAL2001",
+                    "description": apiObj._lang.validation.integer_too_small
+                  };
+                }
+                if (param.hasOwnProperty(["validation"]) &&
+                    param["validation"].hasOwnProperty("lesserThan") &&
+                    paramValue > parseInt(param["validation"]["lesserThan"])) {
+                  // Error - String length longer then needed
+                  validationErrors[validationErrors.length] = {
+                    "param": param["paramName"],
+                    "code": "VAL2002",
+                    "description": apiObj._lang.validation.integer_too_big
+                  };
+                }
+
+              } catch (e) {
+                validationErrors[validationErrors.length] = {
+                  "param": param["paramName"],
+                  "code": "VAL0002",
+                  "description": apiObj._lang.validation.value_not_integer
+                };
+              }
+            }
+          }
+        }
+      }
+
+      return (validationErrors.length > 0 ? validationErrors : undefined);
+    }
+  };
+
 
   /******************************************************************************/
   /* START */
@@ -474,8 +667,10 @@ var API2Go = function(configSettings){
 
         var apiFunction = apiObj.functions[functionId];
 
+        apiObj._lang.set(requestBody.lang);
+
         var requestKey = apiObj.startAudit(functionId, requestBody);
-        var validationErrors = validateFunction(apiObj.config.API_FUNCTIONS_MAP, apiObj.functionsMap, functionId, requestBody);
+        var validationErrors = apiObj.validateFunction(functionId, requestBody);
         if (validationErrors) {
           var returnValues = {"status":"ERROR", "validationErrors": validationErrors};
           apiObj.finishAudit(requestKey, returnValues);
@@ -559,194 +754,6 @@ var loadConfigFile = function(preseted, loadCallback) {
   }
 
   return configs;
-};
-
-/**************************************************************************/
-/* FUNCTION VALIDATION - BEGIN */
-/**************************************************************************/
-// TODO: BREAK THIS SHIT IN PIECES!
-
-var validateFunction = function(mapPath, functionsMap, functionName, requestBody, callback) {
-  if (functionsMap.hasOwnProperty(functionName)) {
-    var validationErrors = [];
-    functionSpecs = functionsMap[functionName];
-
-    // Iterate all the parameters specified in the maps.
-    for (var param in functionSpecs["params"]) {
-      param = functionSpecs["params"][param];
-
-      // The parameter is mandatory but is not in the request content?
-      if (!requestBody.hasOwnProperty(param["paramName"]) &&
-          param["mandatory"] == true) {
-        // Error - Mandatory parameter not present in the request
-        validationErrors[validationErrors.length] = {
-          "param": param["paramName"],
-          "code": "VAL0001",
-          "description": this._lang.validation.mandatory_parameter_not_found
-        };
-
-      } else {
-        var paramValue = requestBody[param["paramName"]];
-
-        if (paramValue !== undefined){
-          // Validation for string
-          if (param["type"] == "string") {
-            paramValue = paramValue.trim();
-
-            if (param.hasOwnProperty(["validation"]) &&
-                param["validation"].hasOwnProperty("longerThan") &&
-                paramValue.length < parseInt(param["validation"]["longerThan"])) {
-              // Error - String length smaller then needed
-              validationErrors[validationErrors.length] = {
-                "param": param["paramName"],
-                "code": "VAL1001",
-                "description": this._lang.validation.string_length_smaller
-              };
-            }
-            if (param.hasOwnProperty(["validation"]) &&
-                param["validation"].hasOwnProperty("longerThan") &&
-                paramValue.length > parseInt(param["validation"]["smallerThan"])) {
-              // Error - String length longer then needed
-              validationErrors[validationErrors.length] = {
-                "param": param["paramName"],
-                "code": "VAL1002", 
-                "description": this._lang.validation.string_length_larger
-              };
-            }
-
-          // validation for integer
-          } else if (param["type"] == "int") {
-            try {
-              paramValue = parseInt(paramValue);
-
-              if (param.hasOwnProperty(["validation"]) &&
-                  param["validation"].hasOwnProperty("greaterThan") &&
-                  paramValue < parseInt(param["validation"]["greaterThan"])) {
-                // Error - String length smaller then needed
-                validationErrors[validationErrors.length] = {
-                  "param": param["paramName"],
-                  "code": "VAL2001",
-                  "description": this._lang.validation.integer_too_small
-                };
-              }
-              if (param.hasOwnProperty(["validation"]) &&
-                  param["validation"].hasOwnProperty("lesserThan") &&
-                  paramValue > parseInt(param["validation"]["lesserThan"])) {
-                // Error - String length longer then needed
-                validationErrors[validationErrors.length] = {
-                  "param": param["paramName"],
-                  "code": "VAL2002",
-                  "description": this._lang.validation.integer_too_big
-                };
-              }
-
-            } catch (e) {
-              validationErrors[validationErrors.length] = {
-                "param": param["paramName"],
-                "code": "VAL0002",
-                "description": this._lang.validation.value_not_integer
-              };
-            }
-          }
-        }
-      }
-    }
-
-    return (validationErrors.length > 0 ? validationErrors : undefined);
-  } else {
-    // Reads the functions-map
-    var fileContent = fs.readFileSync("_assets/functions-map.json");
-    var functionsMap = JSON.parse(fileContent);
-    var validationErrors = [];
-
-    // Verify if the requested function exists in the map.
-    if (!functionsMap.hasOwnProperty(functionName)) {
-      // Error - Function not found
-      validationErrors[validationErrors.length] = {"code": "VAL0000", "description": this._lang.validation.function_not_found};
-    } else {
-      functionSpecs = functionsMap[functionName];
-
-      // Iterate all the parameters specified in the maps.
-      for (var param in functionSpecs["params"]) {
-        param = functionSpecs["params"][param];
-
-        // The parameter is mandatory but is not in the request content?
-        if (!requestBody.hasOwnProperty(param["paramName"]) &&
-            param["mandatory"] == true) {
-          // Error - Mandatory parameter not present in the request
-          validationErrors[validationErrors.length] = {
-            "param": param["paramName"],
-            "code": "VAL0001",
-            "description": this._lang.validation.mandatory_parameter_not_found
-          };
-
-        } else if (requestBody.hasOwnProperty(param["paramName"])) {
-          var paramValue = requestBody[param["paramName"]];
-
-          // Validation for string
-          if (param["type"] == "string") {
-            paramValue = paramValue.trim();
-
-            if (param.hasOwnProperty(["validation"]) &&
-                param["validation"].hasOwnProperty("longerThan") &&
-                paramValue.length < parseInt(param["validation"]["longerThan"])) {
-              // Error - String length smaller then needed
-              validationErrors[validationErrors.length] = {
-                "param": param["paramName"],
-                "code": "VAL1001",
-                "description": this._lang.validation.string_length_smaller
-              };
-            }
-            if (param.hasOwnProperty(["validation"]) &&
-                param["validation"].hasOwnProperty("longerThan") &&
-                paramValue.length > parseInt(param["validation"]["smallerThan"])) {
-              // Error - String length longer then needed
-              validationErrors[validationErrors.length] = {
-                "param": param["paramName"],
-                "code": "VAL1002", "description": this._lang.validation.string_length_larger
-              };
-            }
-
-          // validation for integer
-          } else if (param["type"] == "int") {
-            try {
-              paramValue = parseInt(paramValue);
-
-              if (param.hasOwnProperty(["validation"]) &&
-                  param["validation"].hasOwnProperty("greaterThan") &&
-                  paramValue < parseInt(param["validation"]["greaterThan"])) {
-                // Error - String length smaller then needed
-                validationErrors[validationErrors.length] = {
-                  "param": param["paramName"],
-                  "code": "VAL2001",
-                  "description": this._lang.validation.integer_too_small
-                };
-              }
-              if (param.hasOwnProperty(["validation"]) &&
-                  param["validation"].hasOwnProperty("lesserThan") &&
-                  paramValue > parseInt(param["validation"]["lesserThan"])) {
-                // Error - String length longer then needed
-                validationErrors[validationErrors.length] = {
-                  "param": param["paramName"],
-                  "code": "VAL2002",
-                  "description": this._lang.validation.integer_too_big
-                };
-              }
-
-            } catch (e) {
-              validationErrors[validationErrors.length] = {
-                "param": param["paramName"],
-                "code": "VAL0002",
-                "description": this._lang.validation.value_not_integer
-              };
-            }
-          }
-        }
-      }
-    }
-
-    return (validationErrors.length > 0 ? validationErrors : undefined);
-  }
 };
 
 module.exports = API2Go;
