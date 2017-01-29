@@ -1,6 +1,6 @@
 {
   "name": "api2go",
-  "version": "0.0.25",
+  "version": "0.0.26",
   "description": "Simple structure to create APIs based on HTTP requests over express.",
   "main": "api.js",
   "dependencies": {
