@@ -1,6 +1,6 @@
 {
   "name": "api2go",
-  "version": "0.0.26",
+  "version": "0.0.27",
   "description": "Simple structure to create APIs based on HTTP requests over express.",
   "main": "api.js",
   "dependencies": {
@@ -10,8 +10,8 @@
     "mime": "^1.3.4",
     "moment": "^2.15.1",
     "nodemailer": "~2.6.4",
+    "nodemailer-html-to-text": "^2.1.0",
     "nodemailer-smtp-transport": "~2.7.2",
-    
     "sha1": "~1.1.1"
   },
   "devDependencies": {
