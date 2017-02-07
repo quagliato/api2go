@@ -267,8 +267,8 @@ var API2Go = function(configSettings){
 
     var send = transporter.templateSender(mailTemplate);
 
-    mailOptions['from'] = "{0} <{1}>".format(mailOptions['from_name'], apiObj.config.MAIL_DEFAULT_FROM_USER);
     mailOptions['replyTo'] = "{0} <{1}>".format(mailOptions['from_name'], mailOptions['from'])
+    mailOptions['from'] = "{0} <{1}>".format(mailOptions['from_name'], apiObj.config.MAIL_DEFAULT_FROM_USER);
 
     send(mailOptions, context, function(error, info){
       if(error){
