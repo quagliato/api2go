@@ -7,6 +7,7 @@
 var bodyParser                   = require('body-parser');
 var express                      = require('express');
 var fs                           = require('fs');
+var mime                         = require('mime');
 var moment                       = require('moment');
 var sha1                         = require('sha1');
 
@@ -20,8 +21,6 @@ String.prototype.format = function()
    }
    return content;
 };
-
-
 
 var API2Go = function(configSettings){
   this.audit = {};
@@ -283,11 +282,12 @@ var API2Go = function(configSettings){
   /* FUNCTIONS */
   /******************************************************************************/
   this.registerFunction = function(functionName, processing, functionMap) {
-    apiObj.logger("New function registered: {0}".format(functionName), "INFO");
-    if (apiObj.functionMap !== undefined) {
-      if (apiObj.functionsMap != undefined && functionsMap.hasOwnProperty(functionName)) {
-        logger("Function {0} is already defined in the functions map file. Descading this definition.".format(functionName), "INFO");
-      } else {
+    if (!apiObj.functionsMap.hasOwnProperty(functionName) && !functionMap) {
+      apiObj.logger("Function {0} does not have definition in functions map file, neither inline definition. It won't be registered".format(functionName), "INFO");
+    } else {
+      if (apiObj.functionsMap.hasOwnProperty(functionName) && functionMap) {
+        apiObj.logger("Function {0} is already defined in the functions map file. Descading inline definition.".format(functionName), "INFO");
+      } else if (functionMap) {
         apiObj.functionsMap[functionName] = functionMap;
         var path = "POST-" + functionName;
         if (functionMap.hasOwnProperty("path") && functionMap.hasOwnProperty("module")) {
@@ -308,8 +308,9 @@ var API2Go = function(configSettings){
         }
         apiObj.paths[path] = functionName;
       }
+      apiObj.logger("New function registered: {0}".format(functionName), "INFO");
+      apiObj.functions[functionName] = processing;
     }
-    apiObj.functions[functionName] = processing;
   };
 
   /**************************************************************************/
@@ -333,8 +334,11 @@ var API2Go = function(configSettings){
     return requestKey;
   }
 
-  this.finishAudit = function(requestKey, returnValues) {
-    if (typeof returnValues === "string") returnValues = JSON.parse(returnValues);
+  this.finishAudit = function(requestKey, returnValues, extra) {
+    try {
+      returnValues = JSON.parse(returnValues);
+    } catch (e) {
+    }
 
     var requestInfo = apiObj.audit[requestKey];
 
@@ -349,14 +353,11 @@ var API2Go = function(configSettings){
 
     requestInfo["duration"] = minutes + "m" + (seconds - (minutes * 60)) + "s" + (milliseconds - (seconds * 1000)) + "ms";
     requestInfo["returnValues"] = returnValues;
+    requestInfo["extra"] = extra;
 
     var auditInfo = {};
     auditInfo[requestKey] = requestInfo;
     apiObj.logger(JSON.stringify(auditInfo), "REQUEST-END", apiObj.config.AUDIT_LOG);
-
-    // if (returnValues.hasOwnProperty("status")) {
-    //   response.json(returnValues).end();
-    // }
   }
 
   /**************************************************************************/
@@ -656,7 +657,9 @@ var API2Go = function(configSettings){
             try {
               requestBody = JSON.parse(Object.keys(req.body)[0]);
             } catch (parseError) {
-              res.sendStatus(406).send({"status":"ERROR"});
+              res.sendStatus(406).type('application/json').send({
+                status: 'ERROR'
+              });
             }
           }
         }
@@ -671,27 +674,82 @@ var API2Go = function(configSettings){
 
         var requestKey = apiObj.startAudit(functionId, requestBody);
         var validationErrors = apiObj.validateFunction(functionId, requestBody);
+
         if (validationErrors) {
           var returnValues = {"status":"ERROR", "validationErrors": validationErrors};
-          apiObj.finishAudit(requestKey, returnValues);
-          res.send(returnValues);
+          var returnExtra = {
+              status: 500,
+              type: 'application/json',
+              headers: null
+            };
+          apiObj.finishAudit(requestKey, returnValues, returnExtra);
+          res.status(returnExtra.status).type(returnExtra.type).send(returnValues);
         } else {
+
           if (typeof apiObj.functions[functionId] === "undefined") {
             var returnValues = {"status":"ERROR", "description": "Function not registred."};
-            apiObj.finishAudit(requestKey, returnValues);
-            res.send(returnValues);
-          res.send(returnValues);
+            var returnExtra = {
+              status: 404,
+              type: 'application/json',
+              headers: null
+            };
+            apiObj.finishAudit(requestKey, returnValues, returnExtra);
+            res.status(returnExtra.status).type(returnExtra.type).send(returnValues);
+
           } else {
-            apiFunction(requestBody, requestKey, function(returnValues, callback){
-              apiObj.finishAudit(requestKey, returnValues);
-              if (!res.headersSent) res.send(returnValues).end();
+            apiFunction(requestBody, requestKey, function(returnValues, extra, callback){
+              var status = 200;
+              var type = 'application/json';
+              var file = null;
+
+              if (typeof extra === 'function') {
+                extra = undefined;
+                callback = extra;
+              }
+
+              if (!res.headersSent) {
+                if (extra) {
+                  // If extra has headers, sets all of them
+                  if (extra.headers) for (var header in extra.headers) res.set(header, extra.headers[header]);
+                  
+                  if (extra.type) type = extra.type;
+                  if (extra.status) status = extra.status;
+
+                  if (extra.file) {
+                    if (!returnValues) {
+                      // TODO: Error
+                    }
+                    type = mime.lookup(returnValues);
+                    file = returnValues;
+                  }
+                }
+
+                if (file) res.status(status).type(type).sendFile(returnValues);
+                else if (!returnValues) res.sendStatus(status);
+                else res.status(status).type(type).send(returnValues).end();
+              }
+              
+              var returnExtra = {
+                status: status,
+                type: type,
+                headers: extra && extra.headers ? extra.headers : {},
+              }
+
+              apiObj.finishAudit(requestKey, returnValues, returnExtra);
               if (callback) callback();
-            }, req, res, apiObj);
+            }, req, apiObj);
 
           }
         }
       });
     }
+
+    expressApp.all("*", function(req, res){
+      res.header("Access-Control-Allow-Origin", "*");
+      res.header("Access-Control-Allow-Headers", "X-Requested-With");
+      
+      res.status(404).type('application/json').send({"status":"ERROR", "description": "Function not registred."});
+    });
 
     expressApp.listen(apiObj.config.NODEJS_LISTEN_PORT);
   };

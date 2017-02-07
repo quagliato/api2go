@@ -2,3 +2,15 @@ v0.0.24 -- 2016-10-14
 
 * Empty _logs directory to fix the test
 * Dependencies fix
+
+v0.0.25 -- 2016-12-05
+
+* Language settings;
+* New mail function template;
+* Nodemailer update;
+
+v0.0.26 -- 2017-01-29
+
+* New options on response (define status code, headers and return a file);
+* Update on tests;
+* Better algorithm on function registering;
