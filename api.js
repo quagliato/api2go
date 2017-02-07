@@ -204,6 +204,7 @@ var API2Go = function(configSettings){
 
     var nodemailer = require("nodemailer");
     var smtpTransport = require('nodemailer-smtp-transport');
+    var htmlToText = require('nodemailer-html-to-text').htmlToText;
 
     var validateEmail = function(address){
       var ok = true;
@@ -261,6 +262,8 @@ var API2Go = function(configSettings){
         pass: apiObj.config.MAIL_PASSWORD
       }
     }));
+
+    transporter.use('compile', htmlToText());
 
     var send = transporter.templateSender(mailTemplate);
 
