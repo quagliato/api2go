@@ -1,5 +1,7 @@
 # API2go
 
+[![Build Status](https://travis-ci.org/quagliato/api2go.svg?branch=master)](https://travis-ci.org/quagliato/api2go)
+
 ## Description
 
 Simple structure to create APIs based on HTTP requests over express.
