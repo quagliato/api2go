@@ -392,7 +392,7 @@ var API2Go = function(configSettings){
         } else {
           var paramValue = requestBody[param["paramName"]];
 
-          if (paramValue !== undefined){
+          if (paramValue !== undefined && paramValue !== null){
             // Validation for string
             if (param["type"] == "string") {
               paramValue = paramValue.trim();
