@@ -1,3 +1,5 @@
+'use strict'
+
 // API2GO - Configuration parsing
 // 2017-03-07, Curitiba - Brazil
 // Author: Eduardo Quagliato<eduardo@quagliato.me>

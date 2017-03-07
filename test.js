@@ -1,3 +1,5 @@
+'use strict'
+
 //test.js
 
 var async = require('async');
