@@ -4,16 +4,19 @@
   "API_FUNCTIONS_MAP"        : "_assets/functions-map.json",
   "LANGUAGE_PATH"            : "_lang",
   "LANGUAGE_DEFAULT"         : "en",
-  "AUDIT_LOG"                : "_logs/audit.log",
-  "GENERAL_LOG"              : "_logs/general.log",
-  "DEBUG_LOG"                : "_logs/debug.log",
-  "MAIL_LOG"                 : "_logs/mail.log",
-  "MAX_LOG_FILESIZE"         : "10485760",
   "MAIL_HOST"                : "xxxx",
   "MAIL_PORT"                : "xxxx",
   "MAIL_USER"                : "xxxx",
   "MAIL_PASSWORD"            : "xxxx",
   "MAIL_SECURE"              : true,
   "MAIL_IGNORE_TLS"          : true,
-  "MAIL_DEFAULT_FROM_USER"   : "a@b.c"
+  "MAIL_DEFAULT_FROM_USER"   : "a@b.c",
+  "LOG": {
+    "engine" : "default",
+    "buckets": {
+      "all": "_logs/general.log",
+      "audit": "_logs/audit.log"
+    },
+    "max_filesize": 10485769
+  }
 }

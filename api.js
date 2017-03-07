@@ -1,15 +1,21 @@
+'use strict'
+
 // API2GO
 // Created by Eduardo Quagliato <eduardo@quagliato.me>
 // São Paulo, Brasil
 // 2015-12-21
 
-// DEPENDENCIES (in alphabetical order)
-var bodyParser                   = require('body-parser');
-var express                      = require('express');
-var fs                           = require('fs');
-var mime                         = require('mime');
-var moment                       = require('moment');
-var sha1                         = require('sha1');
+// Dependencies (in alphabetical order)
+const bodyParser                   = require('body-parser');
+const express                      = require('express');
+const fs                           = require('fs');
+const mime                         = require('mime');
+const moment                       = require('moment');
+const sha1                         = require('sha1');
+
+const configParsing              = require('./src/config_parsing');
+const defaultLogger              = require('./src/default_logger');
+const mail                       = require('./src/mail');
 
 String.prototype.format = function()
 {
@@ -30,9 +36,20 @@ var API2Go = function(configSettings){
 
   var apiObj = this;
 
-  apiObj.config = loadConfigFile(configSettings);
+  apiObj.config = configParsing.loadConfigFile(configSettings);
   console.log("Configuration for this instance:");
   console.log(apiObj.config);
+  
+  /**************************************************************************/
+  /* LOGGER */
+  /**************************************************************************/
+
+  // If no log engine is setted or default is setted
+  if (!apiObj.config.hasOwnProperty('LOG') || !apiObj.config.LOG.hasOwnProperty('engine') || apiObj.config.LOG.engine === 'default') {
+    apiObj.logger = function (message, level, bucket) {
+      return defaultLogger(apiObj, message, level, bucket);
+    };
+  }
 
   /****************************************************************************/
   /* API FUNCTIONS */
@@ -131,154 +148,27 @@ var API2Go = function(configSettings){
     }
   };
 
-  /**************************************************************************/
-  /* LOGGER */
-  /**************************************************************************/
-  this.logger = function(message, level, filename) {
-    var LOG_FILENAME = apiObj.config.GENERAL_LOG;
-    var MAX_FILESIZE = apiObj.config.MAX_LOG_FILESIZE; // 10MB
-
-    if (filename === undefined) filename = LOG_FILENAME;
-    if (level === undefined) level = "INFO";
-    var logTimestamp = moment().format("YYYY-MM-DD HH:mm:ss.SSS ZZ");
-
-    if (filename !== undefined) {
-      fs.lstat(filename, function(err, stats){
-        if (err) {
-          print(filename, message, level, logTimestamp);
-        } else {
-          if (stats.size >= MAX_FILESIZE) {
-            rotate(filename, function(){
-              print(filename, message, level, logTimestamp);
-            });
-          } else {
-            print(filename, message, level, logTimestamp);
-          }
-        }
-      });
-
-      function print(filename, message, level, logTimestamp) {
-        var formattedMessage =
-            "[" + logTimestamp + "] " +
-            "[" + level.toUpperCase() + "] " +
-            message;
-        fs.appendFileSync(filename, formattedMessage + "\n", { encoding: "utf8", "mode": 644 });
-        if (level.toUpperCase() == "CRITICAL" || apiObj.config.DEBUG_MODE == 1) {
-          console.log(formattedMessage);
-          if (typeof apiObj.config.DEBUG_LOG !== "undefined") {
-            fs.appendFileSync(apiObj.config.DEBUG_LOG, formattedMessage + "\n", { encoding: "utf8", "mode": 644 });
-          }
-        }
-      }
-
-       function rotate(filename, callback) {
-        fs.rename(filename, filename + "." + moment().format("YYYYMMDDHHmmssSSSZZ"), function(err, data){
-          if (!err) {
-            callback();
-          }
-        });
-      }
-    }
-  };
-
   /******************************************************************************/
   /* MAIL */
   /******************************************************************************/
   this.sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlContent, plainTextContent, callback, ccAddress, bccAddress){
-    var mailOptions = {};
+    const mailOptions = {};
     if (toAddress != undefined) mailOptions['to'] = toAddress;
     if (fromAddress != undefined) mailOptions['from'] = fromAddress;
     if (fromName != undefined) mailOptions['from_name'] = fromName;
     if (ccAddress != undefined) mailOptions['cc'] = ccAddress;
     if (bccAddress != undefined) mailOptions['bcc'] = bccAddress;
 
-    var mailTemplate = {};
+    const mailTemplate = {};
     if (emailSubject != undefined) mailTemplate['subject'] = emailSubject;
     if (htmlContent != undefined) mailTemplate['html'] = htmlContent;
     if (plainTextContent != undefined) mailTemplate['text'] = plainTextContent;
 
     this.sendTemplateMail(mailOptions,mailTemplate,{},callback);
-  }
+  };
 
-  this.sendTemplateMail = function(mailOptions, mailTemplate, context, callback){
-
-    var nodemailer = require("nodemailer");
-    var smtpTransport = require('nodemailer-smtp-transport');
-    var htmlToText = require('nodemailer-html-to-text').htmlToText;
-
-    var validateEmail = function(address){
-      var ok = true;
-      if (address.indexOf("@") <= 0) ok = false;
-      var postAt = address.substr(address.indexOf("@"));
-      if (postAt.indexOf(".") <= 0) ok = false;
-      return ok;
-    }
-
-    if (typeof callback !== "function") {
-      apiObj.logger("The callback for sendMail must be a function.", "CRITICAL");
-      callback(false);
-    }
-
-    if (!mailOptions.hasOwnProperty('to') || mailOptions['to'] == "" || 
-        !mailOptions.hasOwnProperty('from_name') || mailOptions['form_name'] == "" || 
-        !mailOptions.hasOwnProperty('from') || mailOptions['from'] == "" || 
-        !mailTemplate.hasOwnProperty('subject') || mailTemplate['subject'] == "" || 
-        !mailTemplate.hasOwnProperty('html') || mailTemplate['html'] == "") {
-      apiObj.logger("In order to send an email, to address, from address, from name, email subject and HTML content are required.", "CRITICAL");
-      callback(false);
-    }
-
-    if (!validateEmail(mailOptions['to'])) {
-      apiObj.logger("The {0} address is not valid.".format(mailOptions['to']), "CRITICAL");
-      callback(false);
-    }
-
-    if (!validateEmail(mailOptions['from'])) {
-      apiObj.logger("The {0} address is not valid.".format(mailOptions['from']), "CRITICAL");
-      callback(false);
-    }
-
-    if (mailOptions.hasOwnProperty('cc')) {
-      if (!validateEmail(mailOptions['cc'])) {
-        apiObj.logger("The {0} address is not valid.".format(mailOptions['cc']), "CRITICAL");
-        callback(false);
-      }
-    }
-
-    if (mailOptions.hasOwnProperty('bcc')) {
-      if (!validateEmail(mailOptions['bcc'])) {
-        apiObj.logger("The {0} address is not valid.".format(mailOptions['bcc']), "CRITICAL");
-        callback(false);
-      }
-    }
-
-    var transporter = nodemailer.createTransport(smtpTransport({
-      host: apiObj.config.MAIL_HOST,
-      port: apiObj.config.MAIL_PORT,
-      secure: apiObj.config.MAIL_SECURE,
-      ignoreTLS: apiObj.config.MAIL_IGNORE_TLS,
-      auth: {
-        user: apiObj.config.MAIL_USER,
-        pass: apiObj.config.MAIL_PASSWORD
-      }
-    }));
-
-    transporter.use('compile', htmlToText());
-
-    var send = transporter.templateSender(mailTemplate);
-
-    mailOptions['replyTo'] = "{0} <{1}>".format(mailOptions['from_name'], mailOptions['from'])
-    mailOptions['from'] = "{0} <{1}>".format(mailOptions['from_name'], apiObj.config.MAIL_DEFAULT_FROM_USER);
-
-    send(mailOptions, context, function(error, info){
-      if(error){
-        apiObj.logger("The '{0}' email to {1} couldn't be sent. Stacktrace: {2}".format(mailTemplate.subject, mailOptions.to, error), "CRITICAL");
-      } else {
-        apiObj.logger("The '{0}' email to {1} was succefully sent.".format(mailTemplate.subject, mailOptions.to), "INFO");
-      }
-
-      callback((error ? true : false));
-    });
+  this.sendTemplateMail = function(mailOptions, mailTemplate, context, callback) {
+    return mail(apiObj, mailOptions, mailTemplate, context, callback);
   };
 
   /******************************************************************************/
@@ -332,7 +222,7 @@ var API2Go = function(configSettings){
     apiObj.audit[requestKey] = requestInfo;
 
     //TODO: Store requestKey, functionName and values
-    apiObj.logger(JSON.stringify(apiObj.audit[requestKey]), "REQUEST-BEGIN", apiObj.config.AUDIT_LOG);
+    apiObj.logger(JSON.stringify(apiObj.audit[requestKey]), "REQUEST-BEGIN", 'audit');
 
     return requestKey;
   }
@@ -360,7 +250,7 @@ var API2Go = function(configSettings){
 
     var auditInfo = {};
     auditInfo[requestKey] = requestInfo;
-    apiObj.logger(JSON.stringify(auditInfo), "REQUEST-END", apiObj.config.AUDIT_LOG);
+    apiObj.logger(JSON.stringify(auditInfo), "REQUEST-END", 'audit');
   }
 
   /**************************************************************************/
@@ -373,7 +263,7 @@ var API2Go = function(configSettings){
     var functionsMap = apiObj.functionsMap;
     if (functionsMap.hasOwnProperty(functionName)) {
       var validationErrors = [];
-      functionSpecs = functionsMap[functionName];
+      const functionSpecs = functionsMap[functionName];
 
       // Iterate all the parameters specified in the maps.
       for (var param in functionSpecs["params"]) {
@@ -468,7 +358,7 @@ var API2Go = function(configSettings){
         // Error - Function not found
         validationErrors[validationErrors.length] = {"code": "VAL0000", "description": apiObj._lang.validation.function_not_found};
       } else {
-        functionSpecs = functionsMap[functionName];
+        const functionSpecs = functionsMap[functionName];
 
         // Iterate all the parameters specified in the maps.
         for (var param in functionSpecs["params"]) {
@@ -756,65 +646,6 @@ var API2Go = function(configSettings){
 
     expressApp.listen(apiObj.config.NODEJS_LISTEN_PORT);
   };
-};
-
-/**************************************************************************/
-/* CONFIG */
-/**************************************************************************/
-var readFromFile = function(configFilepath) {
-  var fileConfigs = {};
-
-  var fileData = fs.lstatSync(configFilepath);
-  if (!fileData) {
-      console.log("Couldn't find {0}.".format(configFilepath));
-  } else {
-    console.log("{0} Loading config file {1}".format(moment().format("YYYY-MM-DD HH:mm:ss.SSS ZZ"), configFilepath));
-    var fileContent = fs.readFileSync(configFilepath);
-    if (!fileContent) {
-      console.log("Couldn't find config file.");
-    } else {
-      var configJSON = JSON.parse(fileContent);
-      for (var key in configJSON) {
-        fileConfigs[key] = configJSON[key];
-      }
-    }
-  }
-
-  return fileConfigs;
-};
-
-var mergeConfig = function(primary, secondary) {
-  var configs = primary;
-  for (var key in configs) {
-    if (secondary !== undefined && secondary.hasOwnProperty(key)) {
-      configs[key] = secondary[key];
-    }
-  }
-
-  if (secondary !== undefined) {
-    for (var key in secondary) {
-      if (!configs.hasOwnProperty(key)) {
-        configs[key] = secondary[key];
-      }
-    }
-  }
-
-  return configs;
-};
-
-var loadConfigFile = function(preseted, loadCallback) {
-  var configs = {};
-
-  var defaultConfigs = readFromFile("{0}/_assets/config-default.json".format(__dirname));
-  if (typeof preseted === "string") {
-    var customConfigs = readFromFile(preseted);
-    configs = mergeConfig(defaultConfigs, customConfigs);
-  } else {
-    if (preseted !== undefined) config = preseted;
-    configs = mergeConfig(defaultConfigs, preseted);
-  }
-
-  return configs;
 };
 
 module.exports = API2Go;
