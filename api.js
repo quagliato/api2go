@@ -13,9 +13,10 @@ const mime                         = require('mime');
 const moment                       = require('moment');
 const sha1                         = require('sha1');
 
-const configParsing              = require('./src/config_parsing');
-const defaultLogger              = require('./src/default_logger');
-const mail                       = require('./src/mail');
+const Audit                  = require('./src/audit');
+const configParsing          = require('./src/config_parsing');
+const defaultLogger          = require('./src/default_logger');
+const mail                   = require('./src/mail');
 
 String.prototype.format = function()
 {
@@ -29,12 +30,13 @@ String.prototype.format = function()
 };
 
 var API2Go = function(configSettings){
-  this.audit = {};
   this.functions = {};
   this.functionsMap = {};
   this.paths = {};
 
   var apiObj = this;
+
+  this.audit = new Audit(apiObj);
 
   apiObj.config = configParsing.loadConfigFile(configSettings);
   console.log("Configuration for this instance:");
@@ -205,53 +207,6 @@ var API2Go = function(configSettings){
       apiObj.functions[functionName] = processing;
     }
   };
-
-  /**************************************************************************/
-  /* AUDIT */
-  /**************************************************************************/
-  this.startAudit = function(functionName, values) {
-    var requestInfo = {
-      "function": functionName,
-      "values": values,
-      "begin-time": moment().format("YYYYMMDDHHmmssSSSZZ")
-    };
-
-    var requestKey = sha1(JSON.stringify(requestInfo));
-    requestInfo["requestKey"] = requestKey;
-
-    apiObj.audit[requestKey] = requestInfo;
-
-    //TODO: Store requestKey, functionName and values
-    apiObj.logger(JSON.stringify(apiObj.audit[requestKey]), "REQUEST-BEGIN", 'audit');
-
-    return requestKey;
-  }
-
-  this.finishAudit = function(requestKey, returnValues, extra) {
-    try {
-      returnValues = JSON.parse(returnValues);
-    } catch (e) {
-    }
-
-    var requestInfo = apiObj.audit[requestKey];
-
-    requestInfo["end-time"] = moment().format("YYYYMMDDHHmmssSSSZZ");
-
-    var beginMoment = moment(requestInfo["begin-time"], "YYYYMMDDHHmmssSSSZZ");
-    var endMoment = moment(requestInfo["end-time"], "YYYYMMDDHHmmssSSSZZ");
-
-    var minutes = endMoment.diff(beginMoment, "minutes");
-    var seconds = endMoment.diff(beginMoment, "seconds");
-    var milliseconds = endMoment.diff(beginMoment, "milliseconds");
-
-    requestInfo["duration"] = minutes + "m" + (seconds - (minutes * 60)) + "s" + (milliseconds - (seconds * 1000)) + "ms";
-    requestInfo["returnValues"] = returnValues;
-    requestInfo["extra"] = extra;
-
-    var auditInfo = {};
-    auditInfo[requestKey] = requestInfo;
-    apiObj.logger(JSON.stringify(auditInfo), "REQUEST-END", 'audit');
-  }
 
   /**************************************************************************/
   /* FUNCTION VALIDATION - BEGIN */
@@ -565,7 +520,7 @@ var API2Go = function(configSettings){
 
         apiObj._lang.set(requestBody.lang);
 
-        var requestKey = apiObj.startAudit(functionId, requestBody);
+        var requestKey = apiObj.audit.start(functionId, requestBody);
         var validationErrors = apiObj.validateFunction(functionId, requestBody);
 
         if (validationErrors) {
@@ -575,7 +530,7 @@ var API2Go = function(configSettings){
               type: 'application/json',
               headers: null
             };
-          apiObj.finishAudit(requestKey, returnValues, returnExtra);
+          apiObj.audit.finish(requestKey, returnValues, returnExtra);
           res.status(returnExtra.status).type(returnExtra.type).send(returnValues);
         } else {
 
@@ -586,7 +541,7 @@ var API2Go = function(configSettings){
               type: 'application/json',
               headers: null
             };
-            apiObj.finishAudit(requestKey, returnValues, returnExtra);
+            apiObj.audit.finish(requestKey, returnValues, returnExtra);
             res.status(returnExtra.status).type(returnExtra.type).send(returnValues);
 
           } else {
@@ -628,7 +583,7 @@ var API2Go = function(configSettings){
                 headers: extra && extra.headers ? extra.headers : {},
               }
 
-              apiObj.finishAudit(requestKey, returnValues, returnExtra);
+              apiObj.audit.finish(requestKey, returnValues, returnExtra);
               if (callback) callback();
             }, req, apiObj);
 
