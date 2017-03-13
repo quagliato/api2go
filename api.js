@@ -6,17 +6,18 @@
 // 2015-12-21
 
 // Dependencies (in alphabetical order)
-const bodyParser                   = require('body-parser');
-const express                      = require('express');
-const fs                           = require('fs');
-const mime                         = require('mime');
-const moment                       = require('moment');
-const sha1                         = require('sha1');
+const bodyParser             = require('body-parser');
+const express                = require('express');
+const fs                     = require('fs');
+const mime                   = require('mime');
+const moment                 = require('moment');
+const sha1                   = require('sha1');
 
 const Audit                  = require('./src/audit');
 const configParsing          = require('./src/config_parsing');
 const defaultLogger          = require('./src/default_logger');
 const mail                   = require('./src/mail');
+const requestValidation      = require('./src/request_validation');
 
 String.prototype.format = function()
 {
@@ -42,9 +43,9 @@ var API2Go = function(configSettings){
   console.log("Configuration for this instance:");
   console.log(apiObj.config);
   
-  /**************************************************************************/
+  /****************************************************************************/
   /* LOGGER */
-  /**************************************************************************/
+  /****************************************************************************/
 
   // If no log engine is setted or default is setted
   if (!apiObj.config.hasOwnProperty('LOG') || !apiObj.config.LOG.hasOwnProperty('engine') || apiObj.config.LOG.engine === 'default') {
@@ -54,9 +55,31 @@ var API2Go = function(configSettings){
   }
 
   /****************************************************************************/
+  /* MAIL */
+  /****************************************************************************/
+  this.sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlContent, plainTextContent, callback, ccAddress, bccAddress){
+    const mailOptions = {};
+    if (toAddress != undefined) mailOptions['to'] = toAddress;
+    if (fromAddress != undefined) mailOptions['from'] = fromAddress;
+    if (fromName != undefined) mailOptions['from_name'] = fromName;
+    if (ccAddress != undefined) mailOptions['cc'] = ccAddress;
+    if (bccAddress != undefined) mailOptions['bcc'] = bccAddress;
+
+    const mailTemplate = {};
+    if (emailSubject != undefined) mailTemplate['subject'] = emailSubject;
+    if (htmlContent != undefined) mailTemplate['html'] = htmlContent;
+    if (plainTextContent != undefined) mailTemplate['text'] = plainTextContent;
+
+    this.sendTemplateMail(mailOptions,mailTemplate,{},callback);
+  };
+
+  this.sendTemplateMail = function(mailOptions, mailTemplate, context, callback) {
+    return mail(apiObj, mailOptions, mailTemplate, context, callback);
+  };
+
+  /****************************************************************************/
   /* API FUNCTIONS */
   /****************************************************************************/
-
   var functionMapFileExists = fs.lstatSync(apiObj.config.API_FUNCTIONS_MAP);
   if (!functionMapFileExists) {
     console.log("Couldn't find the functions map.");
@@ -91,9 +114,41 @@ var API2Go = function(configSettings){
     }
   }
 
-  /**************************************************************************/
+  this.registerFunction = function(functionName, processing, functionMap) {
+    if (!apiObj.functionsMap.hasOwnProperty(functionName) && !functionMap) {
+      apiObj.logger("Function {0} does not have definition in functions map file, neither inline definition. It won't be registered".format(functionName), "INFO");
+    } else {
+      if (apiObj.functionsMap.hasOwnProperty(functionName) && functionMap) {
+        apiObj.logger("Function {0} is already defined in the functions map file. Descading inline definition.".format(functionName), "INFO");
+      } else if (functionMap) {
+        apiObj.functionsMap[functionName] = functionMap;
+        var path = "POST-" + functionName;
+        if (functionMap.hasOwnProperty("path") && functionMap.hasOwnProperty("module")) {
+          // Modules can't have slashes in their names.
+          if (functionMap["module"].indexOf("/") !== undefined) {
+            //TODO: Error
+          }
+
+          // Path must not begin with a slash.
+          if (functionMap["path"].substr(0, 1) == "/") {
+            functionMap["path"] = functionMap["path"].substr(1);
+          }
+
+          path = functionMap["module"] + "/" + functionMap["path"];
+
+          if (functionMap.hasOwnProperty("method")) path = functionMap.method.toUpperCase()+"-"+path;
+          else path = "POST-"+path;
+        }
+        apiObj.paths[path] = functionName;
+      }
+      apiObj.logger("New function registered: {0}".format(functionName), "INFO");
+      apiObj.functions[functionName] = processing;
+    }
+  };
+
+  /****************************************************************************/
   /* LANGUAGE */
-  /**************************************************************************/
+  /****************************************************************************/
   this._lang = {
     set: function(lang) {
       if (lang == undefined) { lang = apiObj.config.LANGUAGE_DEFAULT};
@@ -150,258 +205,9 @@ var API2Go = function(configSettings){
     }
   };
 
-  /******************************************************************************/
-  /* MAIL */
-  /******************************************************************************/
-  this.sendMail = function(toAddress, fromAddress, fromName, emailSubject, htmlContent, plainTextContent, callback, ccAddress, bccAddress){
-    const mailOptions = {};
-    if (toAddress != undefined) mailOptions['to'] = toAddress;
-    if (fromAddress != undefined) mailOptions['from'] = fromAddress;
-    if (fromName != undefined) mailOptions['from_name'] = fromName;
-    if (ccAddress != undefined) mailOptions['cc'] = ccAddress;
-    if (bccAddress != undefined) mailOptions['bcc'] = bccAddress;
-
-    const mailTemplate = {};
-    if (emailSubject != undefined) mailTemplate['subject'] = emailSubject;
-    if (htmlContent != undefined) mailTemplate['html'] = htmlContent;
-    if (plainTextContent != undefined) mailTemplate['text'] = plainTextContent;
-
-    this.sendTemplateMail(mailOptions,mailTemplate,{},callback);
-  };
-
-  this.sendTemplateMail = function(mailOptions, mailTemplate, context, callback) {
-    return mail(apiObj, mailOptions, mailTemplate, context, callback);
-  };
-
-  /******************************************************************************/
-  /* FUNCTIONS */
-  /******************************************************************************/
-  this.registerFunction = function(functionName, processing, functionMap) {
-    if (!apiObj.functionsMap.hasOwnProperty(functionName) && !functionMap) {
-      apiObj.logger("Function {0} does not have definition in functions map file, neither inline definition. It won't be registered".format(functionName), "INFO");
-    } else {
-      if (apiObj.functionsMap.hasOwnProperty(functionName) && functionMap) {
-        apiObj.logger("Function {0} is already defined in the functions map file. Descading inline definition.".format(functionName), "INFO");
-      } else if (functionMap) {
-        apiObj.functionsMap[functionName] = functionMap;
-        var path = "POST-" + functionName;
-        if (functionMap.hasOwnProperty("path") && functionMap.hasOwnProperty("module")) {
-          // Modules can't have slashes in their names.
-          if (functionMap["module"].indexOf("/") !== undefined) {
-            //TODO: Error
-          }
-
-          // Path must not begin with a slash.
-          if (functionMap["path"].substr(0, 1) == "/") {
-            functionMap["path"] = functionMap["path"].substr(1);
-          }
-
-          path = functionMap["module"] + "/" + functionMap["path"];
-
-          if (functionMap.hasOwnProperty("method")) path = functionMap.method.toUpperCase()+"-"+path;
-          else path = "POST-"+path;
-        }
-        apiObj.paths[path] = functionName;
-      }
-      apiObj.logger("New function registered: {0}".format(functionName), "INFO");
-      apiObj.functions[functionName] = processing;
-    }
-  };
-
-  /**************************************************************************/
-  /* FUNCTION VALIDATION - BEGIN */
-  /**************************************************************************/
-  // TODO: BREAK THIS SHIT IN PIECES!
-
-  this.validateFunction = function(functionName, requestBody, callback) {
-    var mapPath = apiObj.config.API_FUNCTIONS_MAP;
-    var functionsMap = apiObj.functionsMap;
-    if (functionsMap.hasOwnProperty(functionName)) {
-      var validationErrors = [];
-      const functionSpecs = functionsMap[functionName];
-
-      // Iterate all the parameters specified in the maps.
-      for (var param in functionSpecs["params"]) {
-        param = functionSpecs["params"][param];
-
-        // The parameter is mandatory but is not in the request content?
-        if (!requestBody.hasOwnProperty(param["paramName"]) &&
-            param["mandatory"] == true) {
-          // Error - Mandatory parameter not present in the request
-          validationErrors[validationErrors.length] = {
-            "param": param["paramName"],
-            "code": "VAL0001",
-            "description": apiObj._lang.validation.mandatory_parameter_not_found
-          };
-
-        } else {
-          var paramValue = requestBody[param["paramName"]];
-
-          if (paramValue !== undefined && paramValue !== null){
-            // Validation for string
-            if (param["type"] == "string") {
-              paramValue = paramValue.trim();
-
-              if (param.hasOwnProperty(["validation"]) &&
-                  param["validation"].hasOwnProperty("longerThan") &&
-                  paramValue.length < parseInt(param["validation"]["longerThan"])) {
-                // Error - String length smaller then needed
-                validationErrors[validationErrors.length] = {
-                  "param": param["paramName"],
-                  "code": "VAL1001",
-                  "description": apiObj._lang.validation.string_length_smaller
-                };
-              }
-              if (param.hasOwnProperty(["validation"]) &&
-                  param["validation"].hasOwnProperty("longerThan") &&
-                  paramValue.length > parseInt(param["validation"]["smallerThan"])) {
-                // Error - String length longer then needed
-                validationErrors[validationErrors.length] = {
-                  "param": param["paramName"],
-                  "code": "VAL1002", 
-                  "description": apiObj._lang.validation.string_length_larger
-                };
-              }
-
-            // validation for integer
-            } else if (param["type"] == "int") {
-              try {
-                paramValue = parseInt(paramValue);
-
-                if (param.hasOwnProperty(["validation"]) &&
-                    param["validation"].hasOwnProperty("greaterThan") &&
-                    paramValue < parseInt(param["validation"]["greaterThan"])) {
-                  // Error - String length smaller then needed
-                  validationErrors[validationErrors.length] = {
-                    "param": param["paramName"],
-                    "code": "VAL2001",
-                    "description": apiObj._lang.validation.integer_too_small
-                  };
-                }
-                if (param.hasOwnProperty(["validation"]) &&
-                    param["validation"].hasOwnProperty("lesserThan") &&
-                    paramValue > parseInt(param["validation"]["lesserThan"])) {
-                  // Error - String length longer then needed
-                  validationErrors[validationErrors.length] = {
-                    "param": param["paramName"],
-                    "code": "VAL2002",
-                    "description": apiObj._lang.validation.integer_too_big
-                  };
-                }
-
-              } catch (e) {
-                validationErrors[validationErrors.length] = {
-                  "param": param["paramName"],
-                  "code": "VAL0002",
-                  "description": apiObj._lang.validation.value_not_integer
-                };
-              }
-            }
-          }
-        }
-      }
-
-      return (validationErrors.length > 0 ? validationErrors : undefined);
-    } else {
-      // Reads the functions-map
-      var fileContent = fs.readFileSync("_assets/functions-map.json");
-      var functionsMap = JSON.parse(fileContent);
-      var validationErrors = [];
-
-      // Verify if the requested function exists in the map.
-      if (!functionsMap.hasOwnProperty(functionName)) {
-        // Error - Function not found
-        validationErrors[validationErrors.length] = {"code": "VAL0000", "description": apiObj._lang.validation.function_not_found};
-      } else {
-        const functionSpecs = functionsMap[functionName];
-
-        // Iterate all the parameters specified in the maps.
-        for (var param in functionSpecs["params"]) {
-          param = functionSpecs["params"][param];
-
-          // The parameter is mandatory but is not in the request content?
-          if (!requestBody.hasOwnProperty(param["paramName"]) &&
-              param["mandatory"] == true) {
-            // Error - Mandatory parameter not present in the request
-            validationErrors[validationErrors.length] = {
-              "param": param["paramName"],
-              "code": "VAL0001",
-              "description": apiObj._lang.validation.mandatory_parameter_not_found
-            };
-
-          } else if (requestBody.hasOwnProperty(param["paramName"])) {
-            var paramValue = requestBody[param["paramName"]];
-
-            // Validation for string
-            if (param["type"] == "string") {
-              paramValue = paramValue.trim();
-
-              if (param.hasOwnProperty(["validation"]) &&
-                  param["validation"].hasOwnProperty("longerThan") &&
-                  paramValue.length < parseInt(param["validation"]["longerThan"])) {
-                // Error - String length smaller then needed
-                validationErrors[validationErrors.length] = {
-                  "param": param["paramName"],
-                  "code": "VAL1001",
-                  "description": apiObj._lang.validation.string_length_smaller
-                };
-              }
-              if (param.hasOwnProperty(["validation"]) &&
-                  param["validation"].hasOwnProperty("longerThan") &&
-                  paramValue.length > parseInt(param["validation"]["smallerThan"])) {
-                // Error - String length longer then needed
-                validationErrors[validationErrors.length] = {
-                  "param": param["paramName"],
-                  "code": "VAL1002", "description": apiObj._lang.validation.string_length_larger
-                };
-              }
-
-            // validation for integer
-            } else if (param["type"] == "int") {
-              try {
-                paramValue = parseInt(paramValue);
-
-                if (param.hasOwnProperty(["validation"]) &&
-                    param["validation"].hasOwnProperty("greaterThan") &&
-                    paramValue < parseInt(param["validation"]["greaterThan"])) {
-                  // Error - String length smaller then needed
-                  validationErrors[validationErrors.length] = {
-                    "param": param["paramName"],
-                    "code": "VAL2001",
-                    "description": apiObj._lang.validation.integer_too_small
-                  };
-                }
-                if (param.hasOwnProperty(["validation"]) &&
-                    param["validation"].hasOwnProperty("lesserThan") &&
-                    paramValue > parseInt(param["validation"]["lesserThan"])) {
-                  // Error - String length longer then needed
-                  validationErrors[validationErrors.length] = {
-                    "param": param["paramName"],
-                    "code": "VAL2002",
-                    "description": apiObj._lang.validation.integer_too_big
-                  };
-                }
-
-              } catch (e) {
-                validationErrors[validationErrors.length] = {
-                  "param": param["paramName"],
-                  "code": "VAL0002",
-                  "description": apiObj._lang.validation.value_not_integer
-                };
-              }
-            }
-          }
-        }
-      }
-
-      return (validationErrors.length > 0 ? validationErrors : undefined);
-    }
-  };
-
-
-  /******************************************************************************/
+  /****************************************************************************/
   /* START */
-  /******************************************************************************/
+  /****************************************************************************/
   this.start = function(){
     var expressApp = new express();
 
@@ -427,9 +233,9 @@ var API2Go = function(configSettings){
     };
     expressApp.use(allowCrossDomain);
 
-    /****************************************************************************/
+    /**************************************************************************/
     /* HEALTH CHECK */
-    /****************************************************************************/
+    /**************************************************************************/
     expressApp.post("/status", function(request, response){
       response.header("Access-Control-Allow-Origin", "*");
       response.header("Access-Control-Allow-Headers", "X-Requested-With");
@@ -442,9 +248,9 @@ var API2Go = function(configSettings){
       response.send({"status":"OK"});
     });
 
-    /****************************************************************************/
+    /**************************************************************************/
     /* README PAGE */
-    /****************************************************************************/
+    /**************************************************************************/
     expressApp.get("/", function(request, response){
       response.header("Access-Control-Allow-Origin", "*");
       response.header("Access-Control-Allow-Headers", "X-Requested-With");
@@ -521,7 +327,7 @@ var API2Go = function(configSettings){
         apiObj._lang.set(requestBody.lang);
 
         var requestKey = apiObj.audit.start(functionId, requestBody);
-        var validationErrors = apiObj.validateFunction(functionId, requestBody);
+        var validationErrors = requestValidation(apiObj, functionId, requestBody);
 
         if (validationErrors) {
           var returnValues = {"status":"ERROR", "validationErrors": validationErrors};
