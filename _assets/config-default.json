@@ -12,7 +12,7 @@
   "MAIL_IGNORE_TLS"          : true,
   "MAIL_DEFAULT_FROM_USER"   : "a@b.c",
   "LOG": {
-    "engine" : "default",
+    "engine" : "none",
     "buckets": {
       "all": "_logs/general.log",
       "audit": "_logs/audit.log"

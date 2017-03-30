@@ -48,7 +48,11 @@ var API2Go = function(configSettings){
   /****************************************************************************/
 
   // If no log engine is setted or default is setted
-  if (!apiObj.config.hasOwnProperty('LOG') || !apiObj.config.LOG.hasOwnProperty('engine') || apiObj.config.LOG.engine === 'default') {
+  if (apiObj.config.LOG && apiObj.config.LOG.engine === 'none') {
+    apiObj.logger = function (message, level, bucket) {
+      return null;
+    };
+  } else if (!apiObj.config.hasOwnProperty('LOG') || !apiObj.config.LOG.hasOwnProperty('engine') || apiObj.config.LOG.engine === 'default') {
     apiObj.logger = function (message, level, bucket) {
       return defaultLogger(apiObj, message, level, bucket);
     };
