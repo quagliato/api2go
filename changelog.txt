@@ -24,3 +24,7 @@ v0.0.28 -- 2017-03-06
 
 * Bug fix on requests parameter's validation
 * Travis-CI
+
+v0.0.29 -- 2017-07-11
+
+* Possibility to now show README.md on GET /
