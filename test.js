@@ -5,7 +5,10 @@ var fs = require('fs');
 var request = require('request'); 
 
 var API2Go = require('./api.js');
-var apiObj = new API2Go({"NODEJS_LISTEN_PORT":"8787"});
+var apiObj = new API2Go({
+  "NODEJS_LISTEN_PORT":"8787",
+  "SHOW_README": 0
+});
 
 async.series([
 
@@ -171,6 +174,25 @@ async.series([
         return cb(new Error('Fourth test did not return a valid JSON.'));
       }
       
+      cb();
+    });
+  },
+
+  // 5th test
+  function (cb) {
+    var requestOptions = {
+      url: 'http://localhost:' + apiObj.config.NODEJS_LISTEN_PORT + '/',
+      method: 'GET'
+    };
+
+    request(requestOptions, function (err, httpResponse, body) {
+      console.log(err);
+      console.log(httpResponse.statusCode);
+      console.log(body);
+      if (err) return cb(new Error('Error on 5th test\'s request'));
+      if (httpResponse.statusCode !== 200) return cb(new Error('The 5th test did not return status 200.'));
+      if (body.indexOf('It works!') === -1) return cb(new Error('The 5th test did not return the expected body.'));
+
       cb();
     });
   }

@@ -603,20 +603,25 @@ var API2Go = function(configSettings){
     expressApp.get("/", function(request, response){
       response.header("Access-Control-Allow-Origin", "*");
       response.header("Access-Control-Allow-Headers", "X-Requested-With");
-      fs.lstat("README.md", function(err, stats) {
-        if (err) {
-          response.sendStatus(404).send({"status":"ERROR"});
-        } else {
-          fs.readFile("README.md", "utf-8", function(err, readmeFileContent){
-            var markdown = require('markdown').markdown;
 
-            //TODO: Too heavy doing this all the time?
-            var htmlContent = markdown.toHTML(readmeFileContent);
-            response.set("Content-Type", "text/html");
-            response.end(htmlContent);
-          });
-        }
-      });
+      if (apiObj.config.SHOW_README === 0) {
+        response.send('It works!');
+      } else {
+        fs.lstat("README.md", function(err, stats) {
+          if (err) {
+            response.sendStatus(404).send({"status":"ERROR"});
+          } else {
+            fs.readFile("README.md", "utf-8", function(err, readmeFileContent){
+              var markdown = require('markdown').markdown;
+
+              //TODO: Too heavy doing this all the time?
+              var htmlContent = markdown.toHTML(readmeFileContent);
+              response.set("Content-Type", "text/html");
+              response.end(htmlContent);
+            });
+          }
+        });
+      }
     });
 
     for (functionName in apiObj.functionsMap) {
