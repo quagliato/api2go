@@ -51,11 +51,6 @@ Audit.prototype.finish = function (requestKey, returnValues, extra) {
   const apiObj = this.apiObj;
   const audit = this;
 
-  try {
-    returnValues = JSON.parse(returnValues);
-  } catch (e) {
-  }
-
   const requestInfo = audit.records[requestKey];
 
   requestInfo.end = moment().format("YYYYMMDDHHmmssSSSZZ");
@@ -68,7 +63,16 @@ Audit.prototype.finish = function (requestKey, returnValues, extra) {
   const milliseconds = endMoment.diff(beginMoment, "milliseconds");
 
   requestInfo.duration = `${minutes}m${(seconds - (minutes * 60))}s${(milliseconds - (seconds * 1000))}ms`;
-  requestInfo.returnValues = returnValues;
+  if (typeof returnValues !== 'string') returnValues = JSON.stringify(returnValues)
+  if (returnValues.length > 500) {
+    returnValues = returnValues.substr(0, 500) + '...'
+  } else {
+    try {
+      returnValues = JSON.parse(returnValues);
+    } catch (e) {
+    }
+  }
+  requestInfo.returnValues = returnValues
   requestInfo.extra = extra;
 
   var auditInfo = {};
